@@ -28,24 +28,28 @@ terraform {
 
 Always deploy resources in this dependency order:
 1. **AWS IAM** — cross-account role for Databricks control plane
-2. **AWS S3** — root storage bucket for the workspace
+2. **AWS S3 metastore** — single bucket for Unity Catalog metastore-level managed storage
 3. **Databricks credential config** — references the IAM role ARN
-4. **Databricks storage config** — references the S3 bucket
-5. **Databricks workspace** (`databricks_mws_workspaces`) — references credential + storage configs
-6. **Metastore assignment** — assign the existing Unity Catalog metastore to the workspace
-7. **Catalog + workspace binding** — create catalog, bind to workspace
+4. **Databricks workspace** (`databricks_mws_workspaces`) — references credential config (workspace-root bucket deferred for this iteration)
+5. **Metastore** (`databricks_metastore`) — point `storage_root` at the S3 metastore bucket
+6. **Metastore assignment** — bind metastore to each workspace
+7. **Catalog + workspace binding** — create catalog (inherits storage from metastore), bind to workspace
 
 ### Key Terraform Resources
 
 | Resource | Purpose |
 |----------|---------|
 | `databricks_mws_credentials` | Cross-account IAM role registration |
-| `databricks_mws_storage_configurations` | S3 root bucket registration |
 | `databricks_mws_workspaces` | Workspace provisioning |
-| `databricks_metastore` | Unity Catalog metastore (one per region) |
+| `databricks_metastore` | Unity Catalog metastore (one per region) — `storage_root` points at the S3 metastore bucket |
 | `databricks_metastore_assignment` | Bind metastore to workspace |
-| `databricks_catalog` | Unity Catalog catalog |
+| `databricks_catalog` | Unity Catalog catalog (inherits managed storage from metastore) |
 | `databricks_catalog_workspace_binding` | Bind catalog to a specific workspace |
+
+### Project scope notes (current iteration)
+- Only 2 S3 buckets in scope: `dbks-infra-s3-tf-state` (no encryption) and `dbks-infra-s3-metastore`.
+- `databricks_mws_storage_configurations` and per-workspace root buckets are deferred — revisit when workspace provisioning is enabled.
+- Metastore-level `storage_root` is used (not catalog-level). Databricks' current recommendation prefers catalog-level for data isolation, but this project opts for the simpler metastore-level model for now.
 
 ### IAM Cross-Account Role
 

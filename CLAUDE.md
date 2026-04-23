@@ -45,11 +45,23 @@ terraform fmt -check -recursive
 
 
 ## Rules
-- Never hardcode credentials
+- Never hardcode credentials — store them in AWS Secrets Manager (encrypted with a customer-managed KMS key)
 - Always run terraform plan before apply
 - All changes go through feature branch → dev → main
-- Follow naming conventions in /docs/naming-conventions.md
+- Follow naming conventions in `docs/naming-conventions.docx`
 
-`*.tfvars` and `*.tfvars.json` files are gitignored and contain sensitive values — never commit them.
+`*.tfvars` and `*.tfvars.json` files are gitignored and contain sensitive values — never commit them. Runtime credentials (Databricks PAT, account client secret, etc.) must live in Secrets Manager, not in tfvars.
 
-Terraform state files (`*.tfstate`) are also gitignored; remote state (e.g., S3 + DynamoDB locking) is expected for shared environments.
+Terraform state files (`*.tfstate`) are also gitignored; remote state (S3 + DynamoDB locking, KMS-encrypted) is expected for shared environments.
+
+## Documentation
+- `docs/naming-conventions.docx` — authoritative naming rules for every resource
+- `docs/folder-structure.md` — directory layout and file purpose
+- `docs/architecture/aws-infrastructure.drawio` — AWS infrastructure architecture (VPC, IAM, Secrets Manager, KMS, CloudTrail)
+- `docs/architecture/databricks-architecture.drawio` — Databricks metastore → workspaces → catalogs → schemas
+
+## Security baseline
+- S3 buckets: SSE-KMS (CMK), versioning ON, public access BLOCKED
+- Secrets: AWS Secrets Manager with CMK + automatic rotation
+- IAM: OIDC federation for GitHub Actions, cross-account roles with `sts:ExternalId` condition for Databricks
+- Audit: multi-region CloudTrail with log file validation, shipped to S3 + CloudWatch Logs

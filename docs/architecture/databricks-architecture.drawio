@@ -28,7 +28,7 @@
     </mxCell>
 
     <!-- ── DEV WORKSPACE ── -->
-    <mxCell id="ws_dev" value="WORKSPACE: DEV" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+    <mxCell id="ws_dev" value="WORKSPACE: dbks-infra-dev-ws" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
       <mxGeometry x="100" y="250" width="600" height="860" as="geometry"/>
     </mxCell>
     <mxCell id="ws_dev_sub" value="Bound to: DEV environment | Branch: dev" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;fontStyle=2;" vertex="1" parent="1">
@@ -36,7 +36,7 @@
     </mxCell>
 
     <!-- DEV Catalog -->
-    <mxCell id="cat_dev" value="CATALOG: vicmo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+    <mxCell id="cat_dev" value="CATALOG: dbks-infra-dev-cat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
       <mxGeometry x="130" y="320" width="540" height="760" as="geometry"/>
     </mxCell>
     <mxCell id="cat_dev_sub" value="Project-scoped | Bound to workspace DEV" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;fontStyle=2;" vertex="1" parent="1">
@@ -61,20 +61,20 @@
     </mxCell>
 
     <!-- DEV Table reference example -->
-    <mxCell id="ref_dev" value="Table reference (same workspace):&#xa;vicmo.silver.fact_sells&#xa;&#xa;Cross-workspace (exceptional):&#xa;DEV.vicmo.silver.fact_sells" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0ff;strokeColor=#9673a6;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+    <mxCell id="ref_dev" value="Table reference (same workspace):&#xa;dbks-infra-dev-cat.silver.fact_sells&#xa;&#xa;Cross-workspace (exceptional):&#xa;DEV.dbks-infra-dev-cat.silver.fact_sells" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0ff;strokeColor=#9673a6;fontSize=11;fontStyle=2;" vertex="1" parent="1">
       <mxGeometry x="155" y="800" width="490" height="80" as="geometry"/>
     </mxCell>
 
     <!-- DEV Service Principal & Group -->
-    <mxCell id="sp_dev" value="Service Principal: vicmo-sp-deploy&#xa;Service Principal: vicmo-sp-etl" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+    <mxCell id="sp_dev" value="Service Principal: dbks-infra-dev-sp-deploy&#xa;Service Principal: dbks-infra-dev-sp-etl" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
       <mxGeometry x="155" y="900" width="235" height="55" as="geometry"/>
     </mxCell>
-    <mxCell id="grp_dev" value="Group: vicmo-grp-data-engineers&#xa;Group: vicmo-grp-analysts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+    <mxCell id="grp_dev" value="Group: dbks-infra-dev-grp-data-engineers&#xa;Group: dbks-infra-dev-grp-analysts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
       <mxGeometry x="410" y="900" width="235" height="55" as="geometry"/>
     </mxCell>
 
     <!-- ── PROD WORKSPACE ── -->
-    <mxCell id="ws_prod" value="WORKSPACE: PROD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+    <mxCell id="ws_prod" value="WORKSPACE: dbks-infra-prod-ws" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
       <mxGeometry x="960" y="250" width="600" height="860" as="geometry"/>
     </mxCell>
     <mxCell id="ws_prod_sub" value="Bound to: PROD environment | Branch: main" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;fontStyle=2;" vertex="1" parent="1">
@@ -82,7 +82,7 @@
     </mxCell>
 
     <!-- PROD Catalog -->
-    <mxCell id="cat_prod" value="CATALOG: vicmo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+    <mxCell id="cat_prod" value="CATALOG: dbks-infra-prod-cat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
       <mxGeometry x="990" y="320" width="540" height="760" as="geometry"/>
     </mxCell>
     <mxCell id="cat_prod_sub" value="Project-scoped | Bound to workspace PROD" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;fontStyle=2;" vertex="1" parent="1">
@@ -107,15 +107,15 @@
     </mxCell>
 
     <!-- PROD Table reference example -->
-    <mxCell id="ref_prod" value="Table reference (same workspace):&#xa;vicmo.silver.fact_sells&#xa;&#xa;Cross-workspace (exceptional):&#xa;PROD.vicmo.silver.fact_sells" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0ff;strokeColor=#9673a6;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+    <mxCell id="ref_prod" value="Table reference (same workspace):&#xa;dbks-infra-prod-cat.silver.fact_sells&#xa;&#xa;Cross-workspace (exceptional):&#xa;PROD.dbks-infra-prod-cat.silver.fact_sells" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0ff;strokeColor=#9673a6;fontSize=11;fontStyle=2;" vertex="1" parent="1">
       <mxGeometry x="1015" y="800" width="490" height="80" as="geometry"/>
     </mxCell>
 
     <!-- PROD Service Principal & Group -->
-    <mxCell id="sp_prod" value="Service Principal: vicmo-sp-deploy&#xa;Service Principal: vicmo-sp-etl" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+    <mxCell id="sp_prod" value="Service Principal: dbks-infra-prod-sp-deploy&#xa;Service Principal: dbks-infra-prod-sp-etl" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
       <mxGeometry x="1015" y="900" width="235" height="55" as="geometry"/>
     </mxCell>
-    <mxCell id="grp_prod" value="Group: vicmo-grp-data-engineers&#xa;Group: vicmo-grp-analysts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+    <mxCell id="grp_prod" value="Group: dbks-infra-prod-grp-data-engineers&#xa;Group: dbks-infra-prod-grp-analysts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
       <mxGeometry x="1270" y="900" width="235" height="55" as="geometry"/>
     </mxCell>
 
