@@ -27,13 +27,15 @@ terraform {
 ### Deployment Order
 
 Always deploy resources in this dependency order:
-1. **AWS IAM** — cross-account role for Databricks control plane
-2. **AWS S3 metastore** — single bucket for Unity Catalog metastore-level managed storage
-3. **Databricks credential config** — references the IAM role ARN
-4. **Databricks workspace** (`databricks_mws_workspaces`) — references credential config (workspace-root bucket deferred for this iteration)
-5. **Metastore** (`databricks_metastore`) — point `storage_root` at the S3 metastore bucket
-6. **Metastore assignment** — bind metastore to each workspace
-7. **Catalog + workspace binding** — create catalog (inherits storage from metastore), bind to workspace
+1. **AWS VPC + networking** — VPC, subnets, route tables, IGW, NAT GW, NACL, DHCP option set (per `docs/architecture/network-topology.md`)
+2. **AWS IAM** — cross-account role for Databricks control plane
+3. **AWS S3 metastore** — single bucket for Unity Catalog metastore-level managed storage
+4. **Databricks credential config** — references the IAM role ARN
+5. **Databricks network config** (`databricks_mws_networks`) — references VPC ID and the two private subnet IDs
+6. **Databricks workspace** (`databricks_mws_workspaces`) — references credential config + network config (workspace-root bucket deferred for this iteration)
+7. **Metastore** (`databricks_metastore`) — point `storage_root` at the S3 metastore bucket
+8. **Metastore assignment** — bind metastore to each workspace
+9. **Catalog + workspace binding** — create catalog (inherits storage from metastore), bind to workspace
 
 ### Key Terraform Resources
 
@@ -50,6 +52,52 @@ Always deploy resources in this dependency order:
 - Only 2 S3 buckets in scope: `dbks-infra-s3-tf-state` (no encryption) and `dbks-infra-s3-metastore`.
 - `databricks_mws_storage_configurations` and per-workspace root buckets are deferred — revisit when workspace provisioning is enabled.
 - Metastore-level `storage_root` is used (not catalog-level). Databricks' current recommendation prefers catalog-level for data isolation, but this project opts for the simpler metastore-level model for now.
+
+### Network topology (dev) — must match `docs/architecture/network-topology.md`
+
+Customer-managed VPC. Databricks workspace network config must reference the VPC and the **two private subnets only**.
+
+| Resource | Name | CIDR / detail | AZ |
+|---|---|---|---|
+| VPC | `dbks-infra` | `10.0.0.0/16`, DNS resolution + hostnames ON | — |
+| Public subnet | `dbks-infra-dev-public-subnet` | `10.0.0.0/24` | us-east-2a |
+| Private subnet 1 | `dbks-infra-dev-private-subnet` | `10.0.1.0/24` | us-east-2b |
+| Private subnet 2 | `dbks-infra-dev-private-subnet-2` | `10.0.2.0/24` | us-east-2a |
+| Public route table | `dbks-infra-dev-public-rt` | `0.0.0.0/0` → IGW; `10.0.0.0/16` local | — |
+| Private route table | `dbks-infra-dev-private-rt` | `0.0.0.0/0` → NAT GW; `10.0.0.0/16` local | — |
+| Internet Gateway | `dbks-infra-dev-IGW` | — | — |
+| NAT Gateway | `dbks-infra-dev-NATG` | single, in public subnet | us-east-2a |
+| DHCP option set | `dbks-infra-dev-DHCP-option-set` | domain `us-east-2.compute.internal`, AmazonProvidedDNS | — |
+
+```hcl
+resource "databricks_mws_networks" "this" {
+  account_id   = var.databricks_account_id
+  network_name = "dbks-infra-dev-mws-network"
+  vpc_id       = aws_vpc.this.id
+  subnet_ids   = [
+    aws_subnet.private.id,    # dbks-infra-dev-private-subnet    (us-east-2b)
+    aws_subnet.private_2.id,  # dbks-infra-dev-private-subnet-2  (us-east-2a)
+  ]
+  security_group_ids = [aws_security_group.workspace.id]
+}
+```
+
+#### NACL — required outbound ports for Databricks
+The main NACL is associated with all 3 subnets. Outbound must allow:
+
+| Rule | Port | Purpose |
+|---|---|---|
+| 99  | ALL to `10.0.0.0/16` | intra-VPC traffic |
+| 100 | TCP 443 | HTTPS — Databricks control plane, S3, STS |
+| 101 | TCP 3306 | Hive metastore / internal metadata |
+| 102 | TCP 8443 | Databricks secure cluster connectivity (HTTPS*) |
+| 103 | TCP 8445 | Databricks SCC relay |
+| 104 | TCP 8444 | Databricks SCC relay |
+
+If you tighten the NACL, **never drop 8443/8444/8445** — clusters will fail to attach to the control plane.
+
+#### Single-NAT trade-off (dev)
+There is one NAT Gateway in `us-east-2a`. The `us-east-2b` private subnet egresses through it cross-AZ — accept the data-transfer cost and single-AZ failure risk in dev. For prod, deploy one NAT per AZ and one private route table per AZ.
 
 ### IAM Cross-Account Role
 

@@ -24,20 +24,54 @@ description: >
 ## VPC design rules
 
 ### Structure for this project
+Authoritative source: `docs/architecture/network-topology.md`. The dev environment is currently provisioned as:
+
 ```
-VPC: 10.0.0.0/16
-├── Private Subnet AZ-a: 10.0.1.0/24  (Databricks cluster nodes)
-├── Private Subnet AZ-b: 10.0.2.0/24  (Databricks cluster nodes)
-├── Public Subnet AZ-a:  10.0.3.0/24  (NAT Gateway)
-└── Public Subnet AZ-b:  10.0.4.0/24  (NAT Gateway)
+VPC: dbks-infra            CIDR 10.0.0.0/16   (DNS resolution + DNS hostnames: ENABLED)
+├── Public  subnet  dbks-infra-dev-public-subnet     10.0.0.0/24   us-east-2a (use2-az1)
+├── Private subnet  dbks-infra-dev-private-subnet    10.0.1.0/24   us-east-2b (use2-az2)
+└── Private subnet  dbks-infra-dev-private-subnet-2  10.0.2.0/24   us-east-2a (use2-az1)
+
+Route tables
+├── dbks-infra-dev-public-rt   → 0.0.0.0/0 via dbks-infra-dev-IGW,  10.0.0.0/16 local
+│      assoc: dbks-infra-dev-public-subnet
+└── dbks-infra-dev-private-rt  → 0.0.0.0/0 via dbks-infra-dev-NATG, 10.0.0.0/16 local
+       assoc: dbks-infra-dev-private-subnet, dbks-infra-dev-private-subnet-2
+
+Edge
+├── Internet Gateway  dbks-infra-dev-IGW
+└── NAT Gateway       dbks-infra-dev-NATG    (single, in public subnet — dev cost optimization)
+
+DHCP option set: dbks-infra-dev-DHCP-option-set
+       domain name: us-east-2.compute.internal
+       domain name servers: AmazonProvidedDNS
 ```
 
 ### Rules
-- Databricks nodes always go in private subnets
-- NAT Gateway in public subnet for outbound internet access
-- Never put Databricks cluster nodes in public subnets
-- Always use at least 2 AZs for high availability
-- Minimum /26 subnet size for Databricks (needs room for cluster scaling)
+- Databricks nodes always go in private subnets (`-private-subnet`, `-private-subnet-2`)
+- The two private subnets span 2 AZs (us-east-2a, us-east-2b) — required by Databricks for HA
+- Public subnet hosts only the NAT Gateway and IGW attachment — never Databricks clusters
+- Single NAT Gateway in dev (cost optimization). For prod, plan one NAT per AZ.
+- Do not change subnet CIDRs without updating the network spec doc and the Databricks workspace network config
+- Always use AmazonProvidedDNS via the DHCP option set — Databricks requires DNS resolution
+
+### Network ACL (Main NACL — applies to all 3 subnets above)
+Per spec, the main NACL is associated with the public subnet and both private subnets.
+
+Inbound:
+- Rule 99: Allow ALL from `0.0.0.0/0`
+- Rule *: Deny ALL (default)
+
+Outbound (explicit allow list — keep this aligned with the spec doc):
+- Rule 99:  Allow ALL to `10.0.0.0/16` (intra-VPC)
+- Rule 100: Allow TCP 443  to `0.0.0.0/0` (HTTPS — Databricks control plane, S3, STS)
+- Rule 101: Allow TCP 3306 to `0.0.0.0/0` (Hive metastore / internal metadata)
+- Rule 102: Allow TCP 8443 to `0.0.0.0/0` (Databricks secure cluster connectivity — HTTPS*)
+- Rule 103: Allow TCP 8445 to `0.0.0.0/0` (Databricks SCC relay)
+- Rule 104: Allow TCP 8444 to `0.0.0.0/0` (Databricks SCC relay)
+- Rule *:   Deny ALL (default)
+
+> Ports 8443/8444/8445 are Databricks-specific for secure cluster connectivity / control-plane relay. Do not remove them when tightening the NACL.
 
 ---
 
@@ -294,9 +328,12 @@ resource "aws_cloudtrail" "this" {
 ## Architecture checklist
 
 Before finalizing any design verify:
-- [ ] At least 2 AZs used
-- [ ] Databricks nodes in private subnets only
-- [ ] NAT Gateway exists for outbound internet
+- [ ] At least 2 AZs used (dev: private subnets in us-east-2a + us-east-2b)
+- [ ] Databricks nodes in private subnets only (`dbks-infra-dev-private-subnet`, `-private-subnet-2`)
+- [ ] NAT Gateway exists for outbound internet (`dbks-infra-dev-NATG`, in public subnet)
+- [ ] Public route table routes 0.0.0.0/0 → IGW; private route table routes 0.0.0.0/0 → NAT GW
+- [ ] Main NACL outbound allows Databricks ports 443, 3306, 8443, 8444, 8445
+- [ ] DHCP option set uses AmazonProvidedDNS (Databricks requires DNS resolution)
 - [ ] S3 + DynamoDB Gateway VPC endpoints created (free)
 - [ ] Secrets Manager + STS Interface VPC endpoints created
 - [ ] Security groups have self-referencing rules
@@ -320,7 +357,8 @@ Before finalizing any design verify:
 
 ## Availability and resilience
 
-- NAT Gateway: one per AZ for high availability (use single NAT for dev to save cost)
+- NAT Gateway: dev runs a single NAT (`dbks-infra-dev-NATG`) in `dbks-infra-dev-public-subnet` for cost reasons — accept single-AZ NAT failure risk in dev. For prod, deploy one NAT per AZ.
+- Private subnets span 2 AZs (us-east-2a, us-east-2b) so Databricks can place cluster nodes in either AZ even with the single-NAT egress.
 - S3: always cross-region replication for prod state bucket
 - DynamoDB: on-demand billing for lock table (no capacity planning needed)
 
