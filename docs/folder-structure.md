@@ -7,19 +7,25 @@ This document describes the directory layout of the `aws-dbks-infra` Terraform p
 ```
 aws-dbks-infra/
 ├── modules/
-│   ├── metastore/        # Unity Catalog metastore (us-east-2)
-│   ├── workspace/        # Databricks workspace (dev & prod)
-│   └── catalog/          # Unity Catalog catalogs bound to workspaces
+│   ├── network/                # Customer-managed VPC, subnets, RT, IGW, NAT, NACL, SG, DHCP
+│   ├── iam-credential/         # Cross-account IAM role for Databricks control plane
+│   ├── s3-workspace/           # Per-env workspace bucket (artifacts + UC managed data)
+│   ├── iam-storage/            # Self-assuming UC trust role (UCMasterRole + self)
+│   ├── databricks-workspace/   # Credential / network / storage configs + mws_workspace
+│   ├── databricks-catalog/     # Unity Catalog catalog, schemas, workspace binding
+│   └── databricks-cluster/     # Reusable cluster compute (all-purpose / job)
 ├── environments/
-│   ├── dev/              # Dev environment root module (branch: dev)
-│   └── prod/             # Prod environment root module (branch: main)
+│   ├── dev/                    # Dev environment root module (branch: dev)
+│   └── prod/                   # Prod environment root module (branch: main)
 ├── .github/
-│   └── workflows/        # GitHub Actions CI/CD pipelines
-├── docs/                 # Project documentation
+│   └── workflows/              # GitHub Actions CI/CD pipelines
+├── docs/                       # Project documentation
 ├── .gitignore
-├── CLAUDE.md             # Claude Code guidance
+├── CLAUDE.md                   # Claude Code guidance
 └── README.md
 ```
+
+The module breakdown follows Appendix C of `manual-deployment-findings.md` — one module per part of the manual deployment guide, plus a clusters module on top.
 
 ---
 
@@ -29,38 +35,77 @@ aws-dbks-infra/
 
 Reusable Terraform modules. Each module encapsulates a single infrastructure concern and is called by the environment root modules. Modules do not have their own state or provider configuration.
 
-#### `modules/metastore/`
+Every module starts with the same three files (`main.tf`, `variables.tf`, `outputs.tf`); modules with significant network or IAM surface area may add `network.tf` or `iam.tf` later.
 
-Provisions the single Unity Catalog metastore in `us-east-2`, shared across all workspaces.
+#### `modules/network/`
 
-| File | Extension | Purpose |
-|------|-----------|---------|
-| `main.tf` | `.tf` | Core resource definitions: `databricks_metastore`, S3 bucket for metastore storage |
-| `variables.tf` | `.tf` | Input variable declarations (region, bucket name, owner, etc.) |
-| `outputs.tf` | `.tf` | Exported values consumed by other modules (metastore ID, bucket ARN) |
-| `iam.tf` | `.tf` | IAM roles and policies required by the metastore |
+Customer-managed VPC: VPC + DHCP option set, public + two private subnets across two AZs, route tables, IGW, NAT Gateway, main NACL with the Databricks-required outbound ports, and the workspace security group.
 
-#### `modules/workspace/`
+| File | Purpose |
+|------|---------|
+| `main.tf` | `aws_vpc`, `aws_vpc_dhcp_options`, subnets, route tables, IGW, NAT Gateway, NACL, security group |
+| `variables.tf` | `region`, `vpc_cidr`, `azs`, `private_subnet_cidrs`, `public_subnet_cidrs`, `nat_gateway_count` |
+| `outputs.tf` | `vpc_id`, `private_subnet_ids`, `public_subnet_ids`, `security_group_id` |
 
-Provisions a Databricks workspace on AWS. Used once per environment (dev and prod).
+#### `modules/iam-credential/`
 
-| File | Extension | Purpose |
-|------|-----------|---------|
-| `main.tf` | `.tf` | Core resource definitions: `databricks_mws_workspaces`, VPC, subnets, security groups |
-| `variables.tf` | `.tf` | Input variable declarations (workspace name, region, network config, credentials) |
-| `outputs.tf` | `.tf` | Exported values: workspace URL, workspace ID |
-| `network.tf` | `.tf` | VPC, subnets, NAT gateway, and security group resources |
-| `iam.tf` | `.tf` | Cross-account IAM role for Databricks control plane access |
+Cross-account IAM role for the Databricks control plane (Step 2 of the manual deploy). Trust policy: `arn:aws:iam::414351767826:root` with `sts:ExternalId = <databricks_account_id>`.
 
-#### `modules/catalog/`
+| File | Purpose |
+|------|---------|
+| `main.tf` | `aws_iam_role` + inline EC2 cluster lifecycle policy ("default-restrictions" action set) |
+| `variables.tf` | `databricks_account_id`, `role_name` |
+| `outputs.tf` | `role_arn` |
 
-Provisions a Unity Catalog catalog and binds it to a specific workspace.
+#### `modules/s3-workspace/`
 
-| File | Extension | Purpose |
-|------|-----------|---------|
-| `main.tf` | `.tf` | Core resource definitions: `databricks_catalog`, `databricks_catalog_workspace_binding` |
-| `variables.tf` | `.tf` | Input variable declarations (catalog name, metastore ID, workspace ID) |
-| `outputs.tf` | `.tf` | Exported values: catalog name, catalog ID |
+Per-environment workspace bucket (`dbks-infra-{env}-s3-ws`). Holds workspace artifacts AND UC managed data under `/unity-catalog/*`. Bucket policy must `Deny s3:*` on `/unity-catalog/*` for `arn:aws:iam::414351767826:root` to block legacy DBFS access.
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `aws_s3_bucket`, versioning, public-access block, SSE-KMS, `aws_s3_bucket_policy` |
+| `variables.tf` | `bucket_name`, `kms_key_arn`, `databricks_account_id` |
+| `outputs.tf` | `bucket_name`, `bucket_arn` |
+
+#### `modules/iam-storage/`
+
+Self-assuming UC trust role (`dbks-{env}-trust-role-ws`). Trust policy lists both `UCMasterRole` and the role's own ARN — see Step 4.3 of the manual guide. Two-pass apply.
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `aws_iam_role` (self-assuming trust) + inline storage access policy (S3 R/W on `/unity-catalog/*`, KMS Decrypt, `sts:AssumeRole` on self) |
+| `variables.tf` | `databricks_account_id`, `role_name`, `bucket_arn`, `kms_key_arn` |
+| `outputs.tf` | `role_arn` |
+
+#### `modules/databricks-workspace/`
+
+Account-level Databricks configurations (credential, network, storage) and the workspace itself.
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `databricks_mws_credentials`, `databricks_mws_networks`, `databricks_mws_storage_configurations`, `databricks_mws_workspaces` |
+| `variables.tf` | `workspace_name`, `region`, credential/network/storage IDs, `databricks_account_id` |
+| `outputs.tf` | `workspace_id`, `workspace_url` |
+
+#### `modules/databricks-catalog/`
+
+Unity Catalog catalog, schemas, and workspace binding.
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `databricks_catalog`, schemas (`raw`, `bronze`, `silver`, `gold`, `stage`), `databricks_workspace_binding` |
+| `variables.tf` | `catalog_name`, `metastore_id`, `workspace_id` |
+| `outputs.tf` | `catalog_name`, `catalog_id` |
+
+#### `modules/databricks-cluster/`
+
+Reusable Databricks cluster (all-purpose or job-cluster template).
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `databricks_cluster` (or `databricks_job_cluster_template`) |
+| `variables.tf` | `cluster_name`, `node_type_id`, `runtime_version`, `autoscale_min`, `autoscale_max` |
+| `outputs.tf` | `cluster_id` |
 
 ---
 
