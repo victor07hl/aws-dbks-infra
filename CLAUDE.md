@@ -33,10 +33,15 @@ terraform fmt -check -recursive
 
 ## Architecture
 
-- One metastore in us-east-2
+- One metastore in us-east-2 (`dbks-infra-meta-us2`) — **no `storage_root`** configured
 - Two workspaces: dev and prod
 - Two catalogs: dev (bound to workspace-dev), prod (bound to workspace-prod)
 - Two branches: dev (deploys to DEV), main (deploys to PROD)
+
+### Storage topology
+- **`dbks-infra-s3-tf-state`** — shared Terraform remote state (default SSE-S3, no KMS — project decision)
+- **`dbks-infra-{env}-s3-ws`** — one bucket per environment that holds **both** workspace artifacts **and** UC managed data under `/unity-catalog/*`. Bucket policy must `Deny s3:*` on `/unity-catalog/*` for the Databricks root principal to block legacy DBFS access.
+- **No separate metastore bucket** — UC managed data lives in the workspace bucket because the metastore has no `storage_root`.
 
 ## Stack
 - Terraform for all infrastructure
@@ -57,11 +62,12 @@ Terraform state files (`*.tfstate`) are also gitignored; remote state (S3 + Dyna
 ## Documentation
 - `docs/naming-conventions.docx` — authoritative naming rules for every resource
 - `docs/folder-structure.md` — directory layout and file purpose
-- `docs/architecture/aws-infrastructure.drawio` — AWS infrastructure architecture (VPC, IAM, Secrets Manager, KMS, CloudTrail)
-- `docs/architecture/databricks-architecture.drawio` — Databricks metastore → workspaces → catalogs → schemas
+- `docs/manual-deployment-findings.md` — full click-by-click manual deploy guide (Parts 1–12); Appendix C has the canonical Terraform module breakdown to follow when implementing
+- `docs/architecture/network-topology.md` — dev VPC, subnet, route-table, NACL, NAT, IGW spec
+- `docs/architecture/aws-infrastructure.drawio` — multi-page diagram: networking, workspace structure, components infra, storage, IAM, CI/CD pipeline
 
 ## Security baseline
-- S3 buckets: SSE-KMS (CMK), versioning ON, public access BLOCKED
+- S3 buckets: SSE-KMS (per-env CMK), versioning ON, public access BLOCKED — **except** `dbks-infra-s3-tf-state`, which uses default SSE-S3 (no KMS) per project decision
 - Secrets: AWS Secrets Manager with CMK + automatic rotation
-- IAM: OIDC federation for GitHub Actions, cross-account roles with `sts:ExternalId` condition for Databricks
+- IAM: OIDC federation for GitHub Actions, cross-account roles with `sts:ExternalId` condition for Databricks. The UC storage trust role (`dbks-{env}-trust-role-ws`) must be **self-assuming** — its trust policy lists both `UCMasterRole` and the role's own ARN
 - Audit: multi-region CloudTrail with log file validation, shipped to S3 + CloudWatch Logs
