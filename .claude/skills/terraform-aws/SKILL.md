@@ -23,28 +23,41 @@ description: >
 
 ## File structure rules
 
-Every module must have exactly these files:
+Every module must have exactly these three files:
 ```
 module-name/
 ├── main.tf        # resources only
 ├── variables.tf   # input variables with descriptions and types
-├── outputs.tf     # output values
-└── versions.tf    # required providers and versions
+└── outputs.tf     # output values
 ```
 
-Environment folders call modules:
+`versions.tf` and `providers.tf` live at the **environment root**, not per module — modules inherit provider configuration from the calling root.
+
+The repository's actual modules (per `docs/folder-structure.md`):
+```
+modules/
+├── network/                # VPC, subnets, RT, IGW, NAT, NACL, SG, DHCP
+├── iam-credential/         # Cross-account IAM role for Databricks control plane
+├── s3-workspace/           # Per-env workspace bucket (artifacts + UC managed data)
+├── iam-storage/            # Self-assuming UC trust role (UCMasterRole + self)
+├── databricks-workspace/   # mws credential/network/storage configs + workspace
+├── databricks-catalog/     # Unity Catalog catalog, schemas, workspace binding
+└── databricks-cluster/     # Reusable cluster compute
+```
+
+Environment folders compose modules:
 ```
 environments/
 ├── dev/
-│   ├── main.tf         # module calls with dev values
+│   ├── main.tf                # module calls with dev values
 │   ├── variables.tf
 │   ├── outputs.tf
-│   └── terraform.tfvars  # dev-specific values (gitignored)
+│   ├── providers.tf           # AWS + Databricks providers, default_tags
+│   ├── versions.tf            # required_version + required_providers
+│   ├── backend.tf             # S3 remote state, use_lockfile = true
+│   └── terraform.tfvars       # dev-specific values (gitignored)
 └── prod/
-    ├── main.tf         # module calls with prod values
-    ├── variables.tf
-    ├── outputs.tf
-    └── terraform.tfvars  # prod-specific values (gitignored)
+    └── ... (same files, prod values)
 ```
 
 ---
@@ -163,22 +176,68 @@ locals {
 
 ## Module call pattern
 
+Compose the real modules in dependency order. Network first (everything else lives in it), then the IAM/S3 prerequisites for the workspace, then the Databricks resources on top.
+
 ```hcl
-module "aws_base" {
-  source      = "../../modules/aws-base"
-  environment = var.environment
-  region      = var.region
-  tags        = local.common_tags
+module "network" {
+  source = "../../modules/network"
+
+  region               = var.region
+  vpc_cidr             = var.vpc_cidr
+  azs                  = var.azs
+  private_subnet_cidrs = var.private_subnet_cidrs
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  nat_gateway_count    = var.nat_gateway_count
 }
 
-module "aws_storage" {
-  source      = "../../modules/aws-storage"
-  environment = var.environment
-  region      = var.region
-  vpc_id      = module.aws_base.vpc_id
-  tags        = local.common_tags
+module "iam_credential" {
+  source = "../../modules/iam-credential"
+
+  databricks_account_id = var.databricks_account_id
+  role_name             = "dbks-infra-${var.environment}-ws-role"
+}
+
+module "s3_workspace" {
+  source = "../../modules/s3-workspace"
+
+  bucket_name           = "dbks-infra-${var.environment}-s3-ws"
+  kms_key_arn           = aws_kms_key.cmk.arn
+  databricks_account_id = var.databricks_account_id
+}
+
+module "iam_storage" {
+  source = "../../modules/iam-storage"
+
+  databricks_account_id = var.databricks_account_id
+  role_name             = "dbks-${var.environment}-trust-role-ws"
+  bucket_arn            = module.s3_workspace.bucket_arn
+  kms_key_arn           = aws_kms_key.cmk.arn
+}
+
+module "databricks_workspace" {
+  source = "../../modules/databricks-workspace"
+
+  workspace_name        = "dbks-infra-${var.environment}-ws"
+  region                = var.region
+  databricks_account_id = var.databricks_account_id
+  credentials_role_arn  = module.iam_credential.role_arn
+  vpc_id                = module.network.vpc_id
+  private_subnet_ids    = module.network.private_subnet_ids
+  security_group_id     = module.network.security_group_id
+  storage_role_arn      = module.iam_storage.role_arn
+  bucket_name           = module.s3_workspace.bucket_name
+}
+
+module "databricks_catalog" {
+  source = "../../modules/databricks-catalog"
+
+  catalog_name = "dbks-infra-${var.environment}-cat"
+  metastore_id = var.metastore_id
+  workspace_id = module.databricks_workspace.workspace_id
 }
 ```
+
+`databricks-cluster` is called per-cluster as needed, not always.
 
 ---
 
