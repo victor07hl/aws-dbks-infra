@@ -63,6 +63,7 @@ Terraform state files (`*.tfstate`) are also gitignored; remote state (S3 + Dyna
 - `docs/naming-conventions.docx` — authoritative naming rules for every resource
 - `docs/folder-structure.md` — directory layout and file purpose
 - `docs/manual-deployment-findings.md` — full click-by-click manual deploy guide (Parts 1–12); Appendix C has the canonical Terraform module breakdown to follow when implementing
+- `docs/terraform-setup-aws.md` — Terraform-on-AWS bootstrap runbook: state bucket (S3 + native locking, **no DynamoDB**, Terraform 1.10+), local SSO + assume-role, GitHub Actions OIDC trust
 - `docs/architecture/network-topology.md` — dev VPC, subnet, route-table, NACL, NAT, IGW spec
 - `docs/architecture/aws-infrastructure.drawio` — multi-page diagram: networking, workspace structure, components infra, storage, IAM, CI/CD pipeline
 
