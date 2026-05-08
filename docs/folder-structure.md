@@ -117,11 +117,12 @@ Environment-specific root modules. Each folder is an independent Terraform root 
 
 | File | Extension | Purpose |
 |------|-----------|---------|
-| `main.tf` | `.tf` | Calls `modules/metastore`, `modules/workspace`, and `modules/catalog` with env-specific inputs |
+| `main.tf` | `.tf` | Calls the seven `modules/*` modules (network → iam-credential + s3-workspace → iam-storage → databricks-workspace → databricks-catalog, plus databricks-cluster as needed) with env-specific inputs |
 | `variables.tf` | `.tf` | Declares all variables used in this environment |
 | `outputs.tf` | `.tf` | Exposes key values (workspace URL, catalog name) after apply |
-| `providers.tf` | `.tf` | Configures the `aws` and `databricks` providers with region and auth settings |
-| `backend.tf` | `.tf` | Remote state configuration pointing to S3 bucket + DynamoDB lock table |
+| `providers.tf` | `.tf` | Configures the `aws` and `databricks` providers with region, `default_tags`, and auth settings |
+| `versions.tf` | `.tf` | `required_version >= 1.10` and pinned `required_providers` (aws ~> 5.0, databricks ~> 1.39) |
+| `backend.tf` | `.tf` | Remote state in S3 (`dbks-infra-s3-tf-state`) with native S3 locking via `use_lockfile = true` — no DynamoDB |
 | `terraform.tfvars` | `.tfvars` | *(gitignored)* Actual sensitive values: tokens, account IDs, bucket names |
 | `terraform.tfvars.example` | `.tfvars` | Safe template showing required variables without real values — committed to git |
 
