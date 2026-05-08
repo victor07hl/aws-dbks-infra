@@ -13,7 +13,7 @@ description: >
 
 ## Core principles
 - Every resource must be inside a module — no resources in root except module calls
-- Always use remote state (S3 + DynamoDB locking)
+- Always use remote state (S3)
 - Never hardcode values — use variables for everything environment-specific
 - All sensitive values come from environment variables or AWS Secrets Manager
 - Run `terraform validate` and `terraform plan` before every apply
