@@ -241,7 +241,6 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
       "Effect": "Allow",
       "Action": [
         "ec2:*",
-        "iam:*",
         "s3:*",
         "kms:*",
         "secretsmanager:*",
@@ -254,6 +253,51 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
         "StringEqualsIfExists": {
           "aws:RequestTag/Project": "aws-dbks-infra",
           "aws:ResourceTag/Project": "aws-dbks-infra"
+        }
+      }
+    },
+    {
+      "Sid": "ProjectIam",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:CreatePolicy",
+        "iam:DeletePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:GetRole",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "iam:ListRoles",
+        "iam:ListPolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:CreateInstanceProfile",
+        "iam:DeleteInstanceProfile",
+        "iam:AddRoleToInstanceProfile",
+        "iam:RemoveRoleFromInstanceProfile"
+      ],
+      "Resource": [
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:policy/dbks-infra-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:instance-profile/dbks-infra-*"
+      ]
+    },
+    {
+      "Sid": "ProjectIamPassRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": [
+            "ec2.amazonaws.com",
+            "ecs-tasks.amazonaws.com",
+            "lambda.amazonaws.com"
+          ]
         }
       }
     },
@@ -272,10 +316,9 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
 }
 ```
 
-> **Tightening pass.** The wildcards inside `ProjectInfra` are gated
-> by the `Project` tag — Terraform applies the tag via
-> `default_tags`, so any resource it creates is in scope. The `Deny`
-> block hard-stops anything outside Terraform's lane.
+> **Tightening pass.** This policy now scopes IAM actions to the project prefix instead of `iam:*` on `*`.
+> The `ProjectInfra` statement still uses tag-based scoping for non-IAM resources, and the `iam:PassRole` permission is restricted to `dbks-infra-*` roles and approved services.
+> The `Deny` block still hard-stops anything outside Terraform's lane.
 
 ### Step 2.3 — Copy the role ARN
 
