@@ -157,7 +157,9 @@ Open the bucket → **Permissions** → **Bucket policy** → paste **Table
 }
 ```
 
-> The role ARNs don't exist yet — that's fine. AWS accepts the policy
+> The role ARNs don't exist yet — that's fine if you are applying the policy via API/CLI or the console accepts the JSON.
+> 
+> Some AWS consoles will reject `Invalid principal in policy` until the IAM roles exist. If that happens, create the roles in Step 2 before applying this bucket policy.
 > as-is and only enforces it when the principals try to access. You'll
 > create the roles in Parts 2 and 4.
 
