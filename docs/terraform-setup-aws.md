@@ -434,19 +434,144 @@ Now you switch to your terminal. The plan: `aws sso login` gets you a
 short-lived SSO token, the AWS CLI exchanges it for credentials, then
 your Terraform profile assumes `dbks-infra-iam-role-tf-local` on top.
 
+## What is IAM Identity Center and why is it necessary?
+
+IAM Identity Center (formerly AWS SSO) is AWS's centralized identity
+service. Instead of creating long-lived IAM users with permanent access
+keys, Identity Center issues short-lived tokens tied to a human login
+session. When a user logs in, Identity Center creates a temporary role
+in the account (matching `AWSReservedSSO_<permission-set>_<suffix>`) and
+the session expires automatically.
+
+This project's trust policy in Table 2.1a uses the condition:
+
+```json
+"aws:PrincipalArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_*"
+```
+
+That pattern matches exactly those temporary SSO roles — so only a
+human who logged in through Identity Center can assume
+`dbks-infra-iam-role-tf-local`. No permanent access key ever touches
+disk. This is the best practice the doc is designed around.
+
+**The flow is:**
+```
+aws sso login
+  → Identity Center issues a short-lived session
+    → session role: AWSReservedSSO_dbks-infra-ps-tf-local_<suffix>
+      → assumes dbks-infra-iam-role-tf-local  (trust policy matches AWSReservedSSO_*)
+        → Terraform runs with that role's permissions
+```
+
+Before you can run `aws configure sso`, you need three things set up
+in the AWS console. Follow Steps 5.0a through 5.0c below first.
+
+---
+
+### Step 5.0a — Enable IAM Identity Center
+
+**IAM Identity Center** → **Enable** (one-click, free service).
+
+When prompted to choose an identity source, keep the default:
+**Identity Center directory**. This means users live inside AWS — no
+external IdP needed for a single-developer setup.
+
+> IAM Identity Center is regional at the management level but the
+> **AWS access portal URL** is global. Enable it in `us-east-2` to
+> stay consistent with the rest of this project.
+
+Once enabled, note the **AWS access portal URL** shown on the
+dashboard. It looks like `https://d-xxxxxxxxxx.awsapps.com/start`.
+You will paste it in Step 5.1.
+
+---
+
+### Step 5.0b — Create your user
+
+**IAM Identity Center** → **Users** → **Add user**
+
+| Field | Value |
+|---|---|
+| Username | your email (e.g. `you@example.com`) |
+| Email address | same |
+| First / Last name | your name |
+
+After saving, AWS sends a confirmation email. Click the link in that
+email to set your password before moving on.
+
+This user represents **you** — the developer who will run Terraform
+locally.
+
+---
+
+### Step 5.0c — Create a permission set and assign it
+
+A permission set is the set of IAM permissions a user gets for a
+session inside a specific account. The best practice here is to keep
+the permission set itself minimal: it only needs to call
+`sts:AssumeRole` on the Terraform role. All actual Terraform
+permissions live inside `dbks-infra-iam-role-tf-local` (Part 2).
+
+**Why minimal?** If your SSO session were ever compromised, the attacker
+could only assume one specific role. The blast radius is bounded by
+the Terraform role's own policy, not by the full IAM surface of the
+account.
+
+#### Create the permission set
+
+**IAM Identity Center** → **Permission sets** → **Create permission set**
+→ **Custom permission set**
+
+| Field | Value |
+|---|---|
+| Name | `dbks-infra-ps-tf-local` |
+| Description | "SSO entry point for local Terraform runs" |
+| Session duration | 1 hour |
+
+Under **Inline policy**, paste:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "AssumeLocalTfRole",
+    "Effect": "Allow",
+    "Action": "sts:AssumeRole",
+    "Resource": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-iam-role-tf-local"
+  }]
+}
+```
+
+Replace `<AWS_ACCOUNT_ID>` with your account ID.
+
+#### Assign the user to the account
+
+**IAM Identity Center** → **AWS accounts** → select your account →
+**Assign users or groups**
+
+- User: the user from Step 5.0b
+- Permission set: `dbks-infra-ps-tf-local`
+
+After saving, Identity Center provisions the role
+`AWSReservedSSO_dbks-infra-ps-tf-local_<random-suffix>` in your
+account. That is the role the trust policy wildcard in Table 2.1a
+matches.
+
+---
+
 ### Step 5.1 — Configure the SSO profile
 
 Run `aws configure sso` and answer:
 
 ```
 SSO session name: dbks-infra
-SSO start URL:    https://<your-org>.awsapps.com/start
+SSO start URL:    https://d-xxxxxxxxxx.awsapps.com/start   ← from Step 5.0a
 SSO region:       us-east-2
 SSO scopes:       sso:account:access
 ```
 
-Pick the AWS account and permission set when prompted. Name the
-resulting profile `dbks-sso`.
+Pick the AWS account and permission set (`dbks-infra-ps-tf-local`)
+when prompted. Name the resulting profile `dbks-sso`.
 
 ### Step 5.2 — Add the assume-role profile
 
