@@ -1,0 +1,35 @@
+name: Terraform Plan — dev
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-2
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gha-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - run: terraform init
+        working-directory: environments/dev
+
+      - run: terraform plan -no-color
+        working-directory: environments/dev
