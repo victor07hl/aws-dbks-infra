@@ -68,6 +68,69 @@ Region for everything below: **`us-east-2`**.
 
 ---
 
+# Branch and Deployment Strategy
+
+The repository uses three tiers of branches, each with a distinct role in the delivery pipeline:
+
+```
+feature/* ──PR──► dev ──PR──► main
+ (local)        (DEV env)   (PROD env)
+```
+
+| Branch | Environment | Terraform root | Who triggers CI |
+|---|---|---|---|
+| `feature/*` | None — local only | — | No CI; developer validates locally |
+| `dev` | DEV | `environments/dev` | Plan on PR open · Apply on merge |
+| `main` | PROD | `environments/prod` | Plan on PR open · Apply on merge |
+
+### Feature branches
+
+All new work starts on a short-lived branch (`feature/xyz`, `fix/abc`, etc.). The developer validates changes locally using the `dbks-tf` SSO profile (Part 5) before opening a PR. No GitHub Actions workflow runs against feature branches — the OIDC trust policy only covers `dev`, `main`, and the generic `pull_request` claim, so a feature branch push cannot assume the deploy role at all.
+
+Typical local workflow:
+
+```bash
+git checkout -b feature/add-network-module
+# ... edit Terraform ...
+export AWS_PROFILE=dbks-tf
+terraform -chdir=environments/dev plan -var-file="terraform.tfvars"
+# review plan output, iterate, then push and open PR → dev
+```
+
+### dev branch
+
+Maps 1-to-1 to the **DEV** AWS environment (`environments/dev`, state key `envs/dev/terraform.tfstate`).
+
+| Event | Workflow | Action |
+|---|---|---|
+| PR opened / updated targeting `dev` | `plan-dev.yml` | `terraform plan` — output visible in the PR for review |
+| PR merged (push to `dev`) | `apply-dev.yml` | `terraform apply` — DEV environment updated |
+
+A feature branch is merged into `dev` via PR. The plan runs automatically on PR open so reviewers can see exactly what will change before approving.
+
+### main branch
+
+Maps to the **PROD** AWS environment (`environments/prod`, state key `envs/prod/terraform.tfstate`). Changes reach `main` by opening a PR from `dev` — never directly from a feature branch.
+
+| Event | Workflow | Action |
+|---|---|---|
+| PR opened / updated targeting `main` | `plan-prod.yml` | `terraform plan` — must be reviewed before merge |
+| PR merged (push to `main`) | `apply-prod.yml` | `terraform apply` — PROD environment updated |
+
+### OIDC sub-claim mapping
+
+The GitHub Actions deploy role (Part 4) trusts exactly three `sub` claim patterns. Anything else — including feature branch pushes — is rejected at the AWS OIDC layer before any Terraform step runs.
+
+| Sub claim | Granted to |
+|---|---|
+| `repo:victor07hl/aws-dbks-infra:ref:refs/heads/dev` | `apply-dev.yml` (push to `dev`) |
+| `repo:victor07hl/aws-dbks-infra:ref:refs/heads/main` | `apply-prod.yml` (push to `main`) |
+| `repo:victor07hl/aws-dbks-infra:pull_request` | `plan-dev.yml` and `plan-prod.yml` (PR workflows) |
+
+> Feature branches carry a `ref:refs/heads/feature/*` sub claim that matches none of the three patterns above. A CI job on a feature branch **cannot** assume the deploy role — no apply can happen from an unreviewed branch.
+
+---
+
 # Part 1 — Terraform state bucket (S3, no DynamoDB)
 
 You'll create one shared bucket that backs the remote state for **all**
@@ -264,17 +327,27 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
         "iam:DeleteRole",
         "iam:CreatePolicy",
         "iam:DeletePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicyVersion",
         "iam:AttachRolePolicy",
         "iam:DetachRolePolicy",
         "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:UpdateAssumeRolePolicy",
         "iam:GetRole",
+        "iam:GetRolePolicy",
         "iam:GetPolicy",
         "iam:GetPolicyVersion",
         "iam:ListRoles",
+        "iam:ListRolePolicies",
         "iam:ListPolicies",
         "iam:ListAttachedRolePolicies",
+        "iam:ListInstanceProfilesForRole",
+        "iam:ListRoleTags",
         "iam:TagRole",
         "iam:UntagRole",
+        "iam:TagPolicy",
+        "iam:UntagPolicy",
         "iam:CreateInstanceProfile",
         "iam:DeleteInstanceProfile",
         "iam:AddRoleToInstanceProfile",
@@ -283,7 +356,11 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
       "Resource": [
         "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-*",
         "arn:aws:iam::<AWS_ACCOUNT_ID>:policy/dbks-infra-*",
-        "arn:aws:iam::<AWS_ACCOUNT_ID>:instance-profile/dbks-infra-*"
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:instance-profile/dbks-infra-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-dev-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:policy/dbks-dev-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-prod-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:policy/dbks-prod-*"
       ]
     },
     {
@@ -319,6 +396,30 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
 > **Tightening pass.** This policy now scopes IAM actions to the project prefix instead of `iam:*` on `*`.
 > The `ProjectInfra` statement still uses tag-based scoping for non-IAM resources, and the `iam:PassRole` permission is restricted to `dbks-infra-*` roles and approved services.
 > The `Deny` block still hard-stops anything outside Terraform's lane.
+>
+> **`dbks-dev-*` / `dbks-prod-*` scope.** The `ProjectIam` resource list
+> covers three prefixes, not just `dbks-infra-*`. The Unity Catalog storage
+> trust role and its managed policies from the manual deploy
+> (`manual-deployment-findings.md` Part 4) are named **`dbks-dev-trust-role-ws`**,
+> **`dbks-dev-bucket-policy`**, **`dbks-dev-policy-s3-file-events`** — i.e.
+> `dbks-{env}-*`, without the `infra` segment. Terraform must be able to
+> read and manage those, so the policy includes `dbks-dev-*` and
+> `dbks-prod-*` alongside `dbks-infra-*`.
+>
+> **Read + tag actions.** `iam:GetRolePolicy`, `iam:ListRolePolicies`,
+> `iam:ListInstanceProfilesForRole`, `iam:ListRoleTags`, `iam:TagPolicy`,
+> `iam:UntagPolicy`, `iam:CreatePolicyVersion`, `iam:DeletePolicyVersion`,
+> and `iam:UpdateAssumeRolePolicy` are required for `terraform import` /
+> `plan` to read existing role and policy documents and for `default_tags`
+> to tag IAM roles and customer-managed policies. Without them a brownfield
+> import or a tag apply fails with `AccessDenied` on the missing action.
+>
+> **Tag value must match `default_tags`.** The `ProjectInfra` condition keys
+> (`aws:RequestTag/Project`, `aws:ResourceTag/Project`) must equal the exact
+> `Project` value set in `environments/*/providers.tf` `default_tags`
+> (**`aws-dbks-infra`**). If the condition says `dbks-infra` but `default_tags`
+> sends `aws-dbks-infra`, every tagging call is denied — the chicken-and-egg
+> that blocks tagging untagged brownfield resources.
 
 ### Step 2.3 — Copy the role ARN
 
