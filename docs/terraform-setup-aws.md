@@ -571,28 +571,41 @@ SSO scopes:       sso:account:access
 ```
 
 Pick the AWS account and permission set (`dbks-infra-ps-tf-local`)
-when prompted. Name the resulting profile `dbks-sso`.
+when prompted. Name the resulting profile `dbks-tf`.
 
-### Step 5.2 — Add the assume-role profile
+### Step 5.2 — Add role chaining to the profile
 
-Edit `~/.aws/config` and append the block in **Table 5.2** (replace
-`<AWS_ACCOUNT_ID>`).
+`aws configure sso` creates the base SSO profile. Now edit
+`~/.aws/config` and add the three `role_*` lines to the `dbks-tf`
+profile it generated (replace `<AWS_ACCOUNT_ID>`).
 
-**Table 5.2 — `~/.aws/config` snippet**
+**Table 5.2 — `~/.aws/config` — final `dbks-tf` profile**
 
 ```ini
+[sso-session dbks-infra]
+sso_start_url = https://d-xxxxxxxxxx.awsapps.com/start
+sso_region    = us-east-2
+sso_scopes    = sso:account:access
+
 [profile dbks-tf]
-region          = us-east-2
-role_arn        = arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-iam-role-tf-local
-source_profile  = dbks-sso
+sso_session       = dbks-infra
+sso_account_id    = <AWS_ACCOUNT_ID>
+sso_role_name     = dbks-infra-ps-tf-local
+region            = us-east-2
+role_arn          = arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-iam-role-tf-local
 role_session_name = ${USER}-tf-local
-duration_seconds = 3600
+duration_seconds  = 3600
 ```
+
+> AWS CLI v2 supports SSO + role chaining in a single profile. When
+> both `sso_*` fields and `role_arn` are present, the CLI first
+> authenticates via Identity Center, then assumes the specified role
+> automatically. No second profile is needed.
 
 ### Step 5.3 — Verify
 
 ```bash
-aws sso login --profile dbks-sso
+aws sso login --profile dbks-tf
 aws sts get-caller-identity --profile dbks-tf
 ```
 
