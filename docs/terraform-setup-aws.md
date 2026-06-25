@@ -593,7 +593,7 @@ sso_account_id    = <AWS_ACCOUNT_ID>
 sso_role_name     = dbks-infra-ps-tf-local
 region            = us-east-2
 role_arn          = arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-iam-role-tf-local
-role_session_name = ${USER}-tf-local
+role_session_name = <YOUR_USERNAME>-tf-local
 duration_seconds  = 3600
 ```
 
