@@ -571,15 +571,18 @@ SSO scopes:       sso:account:access
 ```
 
 Pick the AWS account and permission set (`dbks-infra-ps-tf-local`)
-when prompted. Name the resulting profile `dbks-tf`.
+when prompted. Name the resulting profile `dbks-sso`.
 
-### Step 5.2 — Add role chaining to the profile
+### Step 5.2 — Add the assume-role profile
 
-`aws configure sso` creates the base SSO profile. Now edit
-`~/.aws/config` and add the three `role_*` lines to the `dbks-tf`
-profile it generated (replace `<AWS_ACCOUNT_ID>`).
+The AWS CLI requires two separate profiles for SSO + role chaining —
+combining `sso_session` and `role_arn` in a single profile causes
+`Partial credentials found in assume-role` errors. Edit
+`~/.aws/config` and append the `dbks-tf` block below the `dbks-sso`
+profile that `aws configure sso` generated (replace `<AWS_ACCOUNT_ID>`
+and `<YOUR_USERNAME>`).
 
-**Table 5.2 — `~/.aws/config` — final `dbks-tf` profile**
+**Table 5.2 — `~/.aws/config` — complete two-profile setup**
 
 ```ini
 [sso-session dbks-infra]
@@ -587,31 +590,36 @@ sso_start_url = https://d-xxxxxxxxxx.awsapps.com/start
 sso_region    = us-east-2
 sso_scopes    = sso:account:access
 
+[profile dbks-sso]
+sso_session    = dbks-infra
+sso_account_id = <AWS_ACCOUNT_ID>
+sso_role_name  = dbks-infra-ps-tf-local
+region         = us-east-2
+
 [profile dbks-tf]
-sso_session       = dbks-infra
-sso_account_id    = <AWS_ACCOUNT_ID>
-sso_role_name     = dbks-infra-ps-tf-local
-region            = us-east-2
+source_profile    = dbks-sso
 role_arn          = arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-iam-role-tf-local
 role_session_name = <YOUR_USERNAME>-tf-local
+region            = us-east-2
 duration_seconds  = 3600
 ```
 
-> AWS CLI v2 supports SSO + role chaining in a single profile. When
-> both `sso_*` fields and `role_arn` are present, the CLI first
-> authenticates via Identity Center, then assumes the specified role
-> automatically. No second profile is needed.
+> `dbks-sso` is the SSO entry point — you reference it only for
+> `aws sso login`. `dbks-tf` is what Terraform and all CLI commands
+> use. The `source_profile = dbks-sso` line is what connects them:
+> the CLI fetches SSO credentials from `dbks-sso`, then uses them to
+> assume `dbks-infra-iam-role-tf-local`.
 
 ### Step 5.3 — Verify
 
 ```bash
-aws sso login --profile dbks-tf
+aws sso login --profile dbks-sso
 aws sts get-caller-identity --profile dbks-tf
 ```
 
 The second command should print an ARN ending in
-`dbks-infra-iam-role-tf-local/<your-user>-tf-local`. If it errors with
-`AccessDenied`, your SSO permission set ARN doesn't match the
+`dbks-infra-iam-role-tf-local/<YOUR_USERNAME>-tf-local`. If it errors
+with `AccessDenied`, your SSO permission set ARN doesn't match the
 `StringLike` condition from Table 2.1a — go fix the trust policy.
 
 ### Step 5.4 — Run Terraform
