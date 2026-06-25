@@ -1,8 +1,8 @@
 terraform {
   backend "s3" {
-    bucket       = "<TF_STATE_BUCKET>"
-    key          = "<STATE_KEY>"
-    region       = "<REGION>"
+    bucket       = "dbks-infra-s3-tf-state"
+    key          = "envs/dev/terraform.tfstate"
+    region       = "us-east-2"
     encrypt      = true
     use_lockfile = true
   }
