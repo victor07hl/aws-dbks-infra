@@ -744,6 +744,10 @@ terraform {
 
 ### Step 7.2 — `versions.tf` per environment
 
+Same content for both environments.
+
+**`environments/dev/versions.tf`** and **`environments/prod/versions.tf`**
+
 ```hcl
 terraform {
   required_version = ">= 1.10"
@@ -762,6 +766,11 @@ terraform {
 ```
 
 ### Step 7.3 — `providers.tf` per environment
+
+Same content for both environments. `var.environment` is declared in
+`variables.tf` (added when the environment root module is wired up).
+
+**`environments/dev/providers.tf`** and **`environments/prod/providers.tf`**
 
 ```hcl
 provider "aws" {
