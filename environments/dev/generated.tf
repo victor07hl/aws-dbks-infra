@@ -294,11 +294,11 @@ resource "aws_iam_policy" "bucket" {
 
 # __generated__ by Terraform
 resource "aws_nat_gateway" "this" {
-  allocation_id                      = "eipalloc-0aed97f3f156aa724"
-  connectivity_type                  = "public"
-  private_ip                         = "10.0.0.79"
-  secondary_allocation_ids           = []
-  subnet_id                          = "subnet-09f846f4d0b575d53"
+  allocation_id            = "eipalloc-0aed97f3f156aa724"
+  connectivity_type        = "public"
+  private_ip               = "10.0.0.79"
+  secondary_allocation_ids = []
+  subnet_id                = "subnet-09f846f4d0b575d53"
   tags = {
     Name = "dbks-infra-dev-NATG"
   }
