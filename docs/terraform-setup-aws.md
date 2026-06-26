@@ -68,6 +68,69 @@ Region for everything below: **`us-east-2`**.
 
 ---
 
+# Branch and Deployment Strategy
+
+The repository uses three tiers of branches, each with a distinct role in the delivery pipeline:
+
+```
+feature/* ──PR──► dev ──PR──► main
+ (local)        (DEV env)   (PROD env)
+```
+
+| Branch | Environment | Terraform root | Who triggers CI |
+|---|---|---|---|
+| `feature/*` | None — local only | — | No CI; developer validates locally |
+| `dev` | DEV | `environments/dev` | Plan on PR open · Apply on merge |
+| `main` | PROD | `environments/prod` | Plan on PR open · Apply on merge |
+
+### Feature branches
+
+All new work starts on a short-lived branch (`feature/xyz`, `fix/abc`, etc.). The developer validates changes locally using the `dbks-tf` SSO profile (Part 5) before opening a PR. No GitHub Actions workflow runs against feature branches — the OIDC trust policy only covers `dev`, `main`, and the generic `pull_request` claim, so a feature branch push cannot assume the deploy role at all.
+
+Typical local workflow:
+
+```bash
+git checkout -b feature/add-network-module
+# ... edit Terraform ...
+export AWS_PROFILE=dbks-tf
+terraform -chdir=environments/dev plan -var-file="terraform.tfvars"
+# review plan output, iterate, then push and open PR → dev
+```
+
+### dev branch
+
+Maps 1-to-1 to the **DEV** AWS environment (`environments/dev`, state key `envs/dev/terraform.tfstate`).
+
+| Event | Workflow | Action |
+|---|---|---|
+| PR opened / updated targeting `dev` | `plan-dev.yml` | `terraform plan` — output visible in the PR for review |
+| PR merged (push to `dev`) | `apply-dev.yml` | `terraform apply` — DEV environment updated |
+
+A feature branch is merged into `dev` via PR. The plan runs automatically on PR open so reviewers can see exactly what will change before approving.
+
+### main branch
+
+Maps to the **PROD** AWS environment (`environments/prod`, state key `envs/prod/terraform.tfstate`). Changes reach `main` by opening a PR from `dev` — never directly from a feature branch.
+
+| Event | Workflow | Action |
+|---|---|---|
+| PR opened / updated targeting `main` | `plan-prod.yml` | `terraform plan` — must be reviewed before merge |
+| PR merged (push to `main`) | `apply-prod.yml` | `terraform apply` — PROD environment updated |
+
+### OIDC sub-claim mapping
+
+The GitHub Actions deploy role (Part 4) trusts exactly three `sub` claim patterns. Anything else — including feature branch pushes — is rejected at the AWS OIDC layer before any Terraform step runs.
+
+| Sub claim | Granted to |
+|---|---|
+| `repo:victor07hl/aws-dbks-infra:ref:refs/heads/dev` | `apply-dev.yml` (push to `dev`) |
+| `repo:victor07hl/aws-dbks-infra:ref:refs/heads/main` | `apply-prod.yml` (push to `main`) |
+| `repo:victor07hl/aws-dbks-infra:pull_request` | `plan-dev.yml` and `plan-prod.yml` (PR workflows) |
+
+> Feature branches carry a `ref:refs/heads/feature/*` sub claim that matches none of the three patterns above. A CI job on a feature branch **cannot** assume the deploy role — no apply can happen from an unreviewed branch.
+
+---
+
 # Part 1 — Terraform state bucket (S3, no DynamoDB)
 
 You'll create one shared bucket that backs the remote state for **all**
@@ -264,17 +327,27 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
         "iam:DeleteRole",
         "iam:CreatePolicy",
         "iam:DeletePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicyVersion",
         "iam:AttachRolePolicy",
         "iam:DetachRolePolicy",
         "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:UpdateAssumeRolePolicy",
         "iam:GetRole",
+        "iam:GetRolePolicy",
         "iam:GetPolicy",
         "iam:GetPolicyVersion",
         "iam:ListRoles",
+        "iam:ListRolePolicies",
         "iam:ListPolicies",
         "iam:ListAttachedRolePolicies",
+        "iam:ListInstanceProfilesForRole",
+        "iam:ListRoleTags",
         "iam:TagRole",
         "iam:UntagRole",
+        "iam:TagPolicy",
+        "iam:UntagPolicy",
         "iam:CreateInstanceProfile",
         "iam:DeleteInstanceProfile",
         "iam:AddRoleToInstanceProfile",
@@ -283,7 +356,11 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
       "Resource": [
         "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-*",
         "arn:aws:iam::<AWS_ACCOUNT_ID>:policy/dbks-infra-*",
-        "arn:aws:iam::<AWS_ACCOUNT_ID>:instance-profile/dbks-infra-*"
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:instance-profile/dbks-infra-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-dev-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:policy/dbks-dev-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-prod-*",
+        "arn:aws:iam::<AWS_ACCOUNT_ID>:policy/dbks-prod-*"
       ]
     },
     {
@@ -319,6 +396,30 @@ tab → paste **Table 2.2**. Name it `dbks-infra-iam-role-tf-local-policy`.
 > **Tightening pass.** This policy now scopes IAM actions to the project prefix instead of `iam:*` on `*`.
 > The `ProjectInfra` statement still uses tag-based scoping for non-IAM resources, and the `iam:PassRole` permission is restricted to `dbks-infra-*` roles and approved services.
 > The `Deny` block still hard-stops anything outside Terraform's lane.
+>
+> **`dbks-dev-*` / `dbks-prod-*` scope.** The `ProjectIam` resource list
+> covers three prefixes, not just `dbks-infra-*`. The Unity Catalog storage
+> trust role and its managed policies from the manual deploy
+> (`manual-deployment-findings.md` Part 4) are named **`dbks-dev-trust-role-ws`**,
+> **`dbks-dev-bucket-policy`**, **`dbks-dev-policy-s3-file-events`** — i.e.
+> `dbks-{env}-*`, without the `infra` segment. Terraform must be able to
+> read and manage those, so the policy includes `dbks-dev-*` and
+> `dbks-prod-*` alongside `dbks-infra-*`.
+>
+> **Read + tag actions.** `iam:GetRolePolicy`, `iam:ListRolePolicies`,
+> `iam:ListInstanceProfilesForRole`, `iam:ListRoleTags`, `iam:TagPolicy`,
+> `iam:UntagPolicy`, `iam:CreatePolicyVersion`, `iam:DeletePolicyVersion`,
+> and `iam:UpdateAssumeRolePolicy` are required for `terraform import` /
+> `plan` to read existing role and policy documents and for `default_tags`
+> to tag IAM roles and customer-managed policies. Without them a brownfield
+> import or a tag apply fails with `AccessDenied` on the missing action.
+>
+> **Tag value must match `default_tags`.** The `ProjectInfra` condition keys
+> (`aws:RequestTag/Project`, `aws:ResourceTag/Project`) must equal the exact
+> `Project` value set in `environments/*/providers.tf` `default_tags`
+> (**`aws-dbks-infra`**). If the condition says `dbks-infra` but `default_tags`
+> sends `aws-dbks-infra`, every tagging call is denied — the chicken-and-egg
+> that blocks tagging untagged brownfield resources.
 
 ### Step 2.3 — Copy the role ARN
 
@@ -571,15 +672,18 @@ SSO scopes:       sso:account:access
 ```
 
 Pick the AWS account and permission set (`dbks-infra-ps-tf-local`)
-when prompted. Name the resulting profile `dbks-tf`.
+when prompted. Name the resulting profile `dbks-sso`.
 
-### Step 5.2 — Add role chaining to the profile
+### Step 5.2 — Add the assume-role profile
 
-`aws configure sso` creates the base SSO profile. Now edit
-`~/.aws/config` and add the three `role_*` lines to the `dbks-tf`
-profile it generated (replace `<AWS_ACCOUNT_ID>`).
+The AWS CLI requires two separate profiles for SSO + role chaining —
+combining `sso_session` and `role_arn` in a single profile causes
+`Partial credentials found in assume-role` errors. Edit
+`~/.aws/config` and append the `dbks-tf` block below the `dbks-sso`
+profile that `aws configure sso` generated (replace `<AWS_ACCOUNT_ID>`
+and `<YOUR_USERNAME>`).
 
-**Table 5.2 — `~/.aws/config` — final `dbks-tf` profile**
+**Table 5.2 — `~/.aws/config` — complete two-profile setup**
 
 ```ini
 [sso-session dbks-infra]
@@ -587,31 +691,36 @@ sso_start_url = https://d-xxxxxxxxxx.awsapps.com/start
 sso_region    = us-east-2
 sso_scopes    = sso:account:access
 
+[profile dbks-sso]
+sso_session    = dbks-infra
+sso_account_id = <AWS_ACCOUNT_ID>
+sso_role_name  = dbks-infra-ps-tf-local
+region         = us-east-2
+
 [profile dbks-tf]
-sso_session       = dbks-infra
-sso_account_id    = <AWS_ACCOUNT_ID>
-sso_role_name     = dbks-infra-ps-tf-local
-region            = us-east-2
+source_profile    = dbks-sso
 role_arn          = arn:aws:iam::<AWS_ACCOUNT_ID>:role/dbks-infra-iam-role-tf-local
-role_session_name = ${USER}-tf-local
+role_session_name = <YOUR_USERNAME>-tf-local
+region            = us-east-2
 duration_seconds  = 3600
 ```
 
-> AWS CLI v2 supports SSO + role chaining in a single profile. When
-> both `sso_*` fields and `role_arn` are present, the CLI first
-> authenticates via Identity Center, then assumes the specified role
-> automatically. No second profile is needed.
+> `dbks-sso` is the SSO entry point — you reference it only for
+> `aws sso login`. `dbks-tf` is what Terraform and all CLI commands
+> use. The `source_profile = dbks-sso` line is what connects them:
+> the CLI fetches SSO credentials from `dbks-sso`, then uses them to
+> assume `dbks-infra-iam-role-tf-local`.
 
 ### Step 5.3 — Verify
 
 ```bash
-aws sso login --profile dbks-tf
+aws sso login --profile dbks-sso
 aws sts get-caller-identity --profile dbks-tf
 ```
 
 The second command should print an ARN ending in
-`dbks-infra-iam-role-tf-local/<your-user>-tf-local`. If it errors with
-`AccessDenied`, your SSO permission set ARN doesn't match the
+`dbks-infra-iam-role-tf-local/<YOUR_USERNAME>-tf-local`. If it errors
+with `AccessDenied`, your SSO permission set ARN doesn't match the
 `StringLike` condition from Table 2.1a — go fix the trust policy.
 
 ### Step 5.4 — Run Terraform
@@ -744,6 +853,10 @@ terraform {
 
 ### Step 7.2 — `versions.tf` per environment
 
+Same content for both environments.
+
+**`environments/dev/versions.tf`** and **`environments/prod/versions.tf`**
+
 ```hcl
 terraform {
   required_version = ">= 1.10"
@@ -762,6 +875,11 @@ terraform {
 ```
 
 ### Step 7.3 — `providers.tf` per environment
+
+Same content for both environments. `var.environment` is declared in
+`variables.tf` (added when the environment root module is wired up).
+
+**`environments/dev/providers.tf`** and **`environments/prod/providers.tf`**
 
 ```hcl
 provider "aws" {

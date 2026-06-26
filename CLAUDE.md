@@ -8,26 +8,28 @@ Terraform infrastructure project for provisioning Databricks Unity Catalog on AW
 
 ## Common Commands
 
+All Terraform commands must be run from within an environment directory (`environments/dev` or `environments/prod`).
+
 ```bash
 # Initialize Terraform (required before first use or after provider changes)
-terraform init
+terraform -chdir=environments/dev init
 
 # Preview changes
-terraform plan -var-file="terraform.tfvars"
+terraform -chdir=environments/dev plan -var-file="terraform.tfvars"
 
 # Apply changes
-terraform apply -var-file="terraform.tfvars"
+terraform -chdir=environments/dev apply -var-file="terraform.tfvars"
 
 # Destroy infrastructure
-terraform destroy -var-file="terraform.tfvars"
+terraform -chdir=environments/dev destroy -var-file="terraform.tfvars"
 
 # Validate configuration
-terraform validate
+terraform -chdir=environments/dev validate
 
-# Format code
+# Format code (run from repo root)
 terraform fmt -recursive
 
-# Check formatting without writing
+# Check formatting without writing (run from repo root)
 terraform fmt -check -recursive
 ```
 
@@ -57,7 +59,7 @@ terraform fmt -check -recursive
 
 `*.tfvars` and `*.tfvars.json` files are gitignored and contain sensitive values — never commit them. Runtime credentials (Databricks PAT, account client secret, etc.) must live in Secrets Manager, not in tfvars.
 
-Terraform state files (`*.tfstate`) are also gitignored; remote state (S3 + DynamoDB locking, KMS-encrypted) is expected for shared environments.
+Terraform state files (`*.tfstate`) are also gitignored; remote state uses S3 with native locking (`use_lockfile = true`, Terraform ≥ 1.10) and SSE-S3 encryption — no DynamoDB, no KMS per project decision (see `docs/terraform-setup-aws.md`).
 
 ## Documentation
 - `docs/naming-conventions.docx` — authoritative naming rules for every resource
