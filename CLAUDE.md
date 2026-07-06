@@ -54,7 +54,7 @@ terraform fmt -check -recursive
 ## Rules
 - Never hardcode credentials — store them in AWS Secrets Manager (encrypted with a customer-managed KMS key)
 - Always run terraform plan before apply
-- All changes go through feature branch → dev → main
+- All changes go through a ticket-named feature branch → dev → main. Feature branches are named `IT_<n>_branch` (e.g. `IT_21_branch`); every promotion is a PR requiring ≥1 approving review. See "Branch and Deployment Strategy" in `docs/terraform-setup-aws.md`. Note: these PR rules are a team convention, not GitHub-enforced (private repo on the Free plan)
 - Follow naming conventions in `docs/naming-conventions.docx`
 
 `*.tfvars` and `*.tfvars.json` files are gitignored and contain sensitive values — never commit them. Runtime credentials (Databricks PAT, account client secret, etc.) must live in Secrets Manager, not in tfvars.
