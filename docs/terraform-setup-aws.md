@@ -73,24 +73,26 @@ Region for everything below: **`us-east-2`**.
 The repository uses three tiers of branches, each with a distinct role in the delivery pipeline:
 
 ```
-feature/* ──PR──► dev ──PR──► main
- (local)        (DEV env)   (PROD env)
+IT_<n>_branch ──PR──► dev ──PR──► main
+   (local)          (DEV env)   (PROD env)
 ```
 
 | Branch | Environment | Terraform root | Who triggers CI |
 |---|---|---|---|
-| `feature/*` | None — local only | — | No CI; developer validates locally |
+| `IT_<n>_branch` | None — local only | — | No CI; developer validates locally |
 | `dev` | DEV | `environments/dev` | Plan on PR open · Apply on merge |
 | `main` | PROD | `environments/prod` | Plan on PR open · Apply on merge |
 
 ### Feature branches
 
-All new work starts on a short-lived branch (`feature/xyz`, `fix/abc`, etc.). The developer validates changes locally using the `dbks-tf` SSO profile (Part 5) before opening a PR. No GitHub Actions workflow runs against feature branches — the OIDC trust policy only covers `dev`, `main`, and the generic `pull_request` claim, so a feature branch push cannot assume the deploy role at all.
+All new work starts on a short-lived branch named after its Jira ticket: **`IT_<n>_branch`**, where `<n>` is the ticket number (e.g. `IT_21_branch` for [IT-21]). One branch per ticket keeps the branch, the PR, and the Jira issue traceable to each other.
+
+The developer validates changes locally using the `dbks-tf` SSO profile (Part 5) before opening a PR. No GitHub Actions workflow runs against feature branches — the OIDC trust policy only covers `dev`, `main`, and the generic `pull_request` claim, so a feature branch push cannot assume the deploy role at all.
 
 Typical local workflow:
 
 ```bash
-git checkout -b feature/add-network-module
+git checkout -b IT_21_branch          # named after the Jira ticket
 # ... edit Terraform ...
 export AWS_PROFILE=dbks-tf
 terraform -chdir=environments/dev plan -var-file="terraform.tfvars"
@@ -127,7 +129,20 @@ The GitHub Actions deploy role (Part 4) trusts exactly three `sub` claim pattern
 | `repo:victor07hl/aws-dbks-infra:ref:refs/heads/main` | `apply-prod.yml` (push to `main`) |
 | `repo:victor07hl/aws-dbks-infra:pull_request` | `plan-dev.yml` and `plan-prod.yml` (PR workflows) |
 
-> Feature branches carry a `ref:refs/heads/feature/*` sub claim that matches none of the three patterns above. A CI job on a feature branch **cannot** assume the deploy role — no apply can happen from an unreviewed branch.
+> Feature branches carry a `ref:refs/heads/IT_<n>_branch` sub claim that matches none of the three patterns above. A CI job on a feature branch **cannot** assume the deploy role — no apply can happen from an unreviewed branch.
+
+### Pull-request and review rules
+
+Every promotion happens through a PR, and each PR must be **approved by at least one collaborator** before it is merged:
+
+| Merge | Direction | Requirement |
+|---|---|---|
+| Feature → `dev` | `IT_<n>_branch` → `dev` | PR + ≥1 approving review |
+| `dev` → `main` | `dev` → `main` | PR from `dev` only (never directly from a feature branch) + ≥1 approving review |
+
+Direct pushes to `dev` or `main` are not allowed by convention — all changes land via a reviewed PR.
+
+> **Enforcement limitation (IT-9 / IT-21).** These PR-and-approval rules are a **team convention, not a hard GitHub gate**. The repository is **private on the GitHub Free plan**, where branch protection and repository rulesets are unavailable (the API returns `403: Upgrade to GitHub Pro or make this repository public`). As a study project we are keeping the repo private and not upgrading, so nothing at the platform level blocks a direct push to `main`. If the repo is ever made public or moved to GitHub Pro, enable branch protection on `dev` and `main` (require a PR, require ≥1 review, require the `Terraform Plan` check to pass) to make these rules enforceable.
 
 ---
 
