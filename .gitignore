@@ -38,3 +38,7 @@ terraform.rc
 
 # Claude Code local settings (contains secrets)
 .claude/settings.local.json
+
+#output plan
+tfplan
+*.tfplan

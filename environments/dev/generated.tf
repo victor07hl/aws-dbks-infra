@@ -39,61 +39,6 @@ resource "aws_iam_role_policy" "credential" {
   role = "dbks-infra-dev-ws-role"
 }
 
-# __generated__ by Terraform
-resource "aws_route_table" "private" {
-  propagating_vgws = []
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = "nat-01c22cd9e5d35b605"
-  }
-  tags = {
-    Name = "dbks-infra-dev-private-rt"
-  }
-  tags_all = {
-    Name = "dbks-infra-dev-private-rt"
-  }
-  vpc_id = "vpc-0c0888b82c6975777"
-}
-
-# __generated__ by Terraform
-resource "aws_route_table" "public" {
-  propagating_vgws = []
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = "igw-04fd7b10931650f25"
-  }
-  tags = {
-    Name = "dbks-infra-dev-public-rt"
-  }
-  tags_all = {
-    Name = "dbks-infra-dev-public-rt"
-  }
-  vpc_id = "vpc-0c0888b82c6975777"
-}
-
-# __generated__ by Terraform
-resource "aws_subnet" "public" {
-  assign_ipv6_address_on_creation                = false
-  availability_zone                              = "us-east-2a"
-  cidr_block                                     = "10.0.0.0/24"
-  customer_owned_ipv4_pool                       = null
-  enable_dns64                                   = false
-  enable_resource_name_dns_a_record_on_launch    = false
-  enable_resource_name_dns_aaaa_record_on_launch = false
-  ipv6_cidr_block                                = null
-  ipv6_native                                    = false
-  map_public_ip_on_launch                        = false
-  outpost_arn                                    = null
-  private_dns_hostname_type_on_launch            = "ip-name"
-  tags = {
-    Name = "dbks-infra-dev-public-subnet"
-  }
-  tags_all = {
-    Name = "dbks-infra-dev-public-subnet"
-  }
-  vpc_id = "vpc-0c0888b82c6975777"
-}
-
 # __generated__ by Terraform from "arn:aws:iam::252231277941:policy/dbks-dev-policy-s3-file-events"
 resource "aws_iam_policy" "file_events" {
   description = "The IAM policy grants Databricks permission to update your buckets event notification configuration, create an SNS topic, create an SQS queue, and subscribe the SQS queue to the SNS topic"
@@ -153,13 +98,6 @@ resource "aws_s3_bucket_policy" "workspace" {
   })
 }
 
-# __generated__ by Terraform from "subnet-09f846f4d0b575d53/rtb-0f6274c0f3b5db937"
-resource "aws_route_table_association" "public" {
-  gateway_id     = null
-  route_table_id = "rtb-0f6274c0f3b5db937"
-  subnet_id      = "subnet-09f846f4d0b575d53"
-}
-
 # __generated__ by Terraform from "dbks-infra-dev-s3-ws"
 resource "aws_s3_bucket_public_access_block" "workspace" {
   block_public_acls       = true
@@ -167,36 +105,6 @@ resource "aws_s3_bucket_public_access_block" "workspace" {
   bucket                  = "dbks-infra-dev-s3-ws"
   ignore_public_acls      = true
   restrict_public_buckets = true
-}
-
-# __generated__ by Terraform from "sg-0929e3fd034aebd7f"
-resource "aws_security_group" "workspace" {
-  description = "launch-wizard-3 created 2026-04-28T20:04:33.678Z"
-  egress = [{
-    cidr_blocks      = ["0.0.0.0/0"]
-    description      = ""
-    from_port        = 0
-    ipv6_cidr_blocks = []
-    prefix_list_ids  = []
-    protocol         = "-1"
-    security_groups  = []
-    self             = false
-    to_port          = 0
-  }]
-  ingress                = []
-  name                   = "launch-wizard-3"
-  name_prefix            = null
-  revoke_rules_on_delete = null
-  tags                   = {}
-  tags_all               = {}
-  vpc_id                 = "vpc-0c0888b82c6975777"
-}
-
-# __generated__ by Terraform from "subnet-0d425a507a3750f95/rtb-0e11f517003820532"
-resource "aws_route_table_association" "private_2" {
-  gateway_id     = null
-  route_table_id = "rtb-0e11f517003820532"
-  subnet_id      = "subnet-0d425a507a3750f95"
 }
 
 # __generated__ by Terraform from "dbks-dev-trust-role-ws"
@@ -255,17 +163,6 @@ resource "aws_iam_role" "credential" {
   tags_all              = {}
 }
 
-# __generated__ by Terraform from "igw-04fd7b10931650f25"
-resource "aws_internet_gateway" "this" {
-  tags = {
-    Name = "dbks-infra-dev-IGW"
-  }
-  tags_all = {
-    Name = "dbks-infra-dev-IGW"
-  }
-  vpc_id = "vpc-0c0888b82c6975777"
-}
-
 # __generated__ by Terraform from "arn:aws:iam::252231277941:policy/dbks-dev-bucket-policy"
 resource "aws_iam_policy" "bucket" {
   description = "This IAM policy grants read and write access"
@@ -292,120 +189,16 @@ resource "aws_iam_policy" "bucket" {
   tags_all = {}
 }
 
-# __generated__ by Terraform
-resource "aws_nat_gateway" "this" {
-  allocation_id            = "eipalloc-0aed97f3f156aa724"
-  connectivity_type        = "public"
-  private_ip               = "10.0.0.79"
-  secondary_allocation_ids = []
-  subnet_id                = "subnet-09f846f4d0b575d53"
-  tags = {
-    Name = "dbks-infra-dev-NATG"
-  }
-  tags_all = {
-    Name = "dbks-infra-dev-NATG"
-  }
-}
-
 # __generated__ by Terraform from "dbks-dev-trust-role-ws/arn:aws:iam::252231277941:policy/dbks-dev-policy-s3-file-events"
 resource "aws_iam_role_policy_attachment" "storage_file_events" {
   policy_arn = "arn:aws:iam::252231277941:policy/dbks-dev-policy-s3-file-events"
   role       = "dbks-dev-trust-role-ws"
 }
 
-# __generated__ by Terraform from "eipalloc-0aed97f3f156aa724"
-resource "aws_eip" "nat" {
-  address                   = null
-  associate_with_private_ip = null
-  customer_owned_ipv4_pool  = null
-  domain                    = "vpc"
-  instance                  = null
-  ipam_pool_id              = null
-  network_border_group      = "us-east-2"
-  network_interface         = "eni-0cca9ef7f384554cb"
-  public_ipv4_pool          = "amazon"
-  tags                      = {}
-  tags_all                  = {}
-}
-
 # __generated__ by Terraform from "dbks-dev-trust-role-ws/arn:aws:iam::252231277941:policy/dbks-dev-bucket-policy"
 resource "aws_iam_role_policy_attachment" "storage_bucket" {
   policy_arn = "arn:aws:iam::252231277941:policy/dbks-dev-bucket-policy"
   role       = "dbks-dev-trust-role-ws"
-}
-
-# __generated__ by Terraform
-resource "aws_subnet" "private_1" {
-  assign_ipv6_address_on_creation                = false
-  availability_zone                              = "us-east-2b"
-  cidr_block                                     = "10.0.1.0/24"
-  customer_owned_ipv4_pool                       = null
-  enable_dns64                                   = false
-  enable_resource_name_dns_a_record_on_launch    = false
-  enable_resource_name_dns_aaaa_record_on_launch = false
-  ipv6_cidr_block                                = null
-  ipv6_native                                    = false
-  map_public_ip_on_launch                        = false
-  outpost_arn                                    = null
-  private_dns_hostname_type_on_launch            = "ip-name"
-  tags = {
-    Name = "dbks-infra-dev-private-subnet"
-  }
-  tags_all = {
-    Name = "dbks-infra-dev-private-subnet"
-  }
-  vpc_id = "vpc-0c0888b82c6975777"
-}
-
-# __generated__ by Terraform
-resource "aws_subnet" "private_2" {
-  assign_ipv6_address_on_creation                = false
-  availability_zone                              = "us-east-2a"
-  cidr_block                                     = "10.0.2.0/24"
-  customer_owned_ipv4_pool                       = null
-  enable_dns64                                   = false
-  enable_resource_name_dns_a_record_on_launch    = false
-  enable_resource_name_dns_aaaa_record_on_launch = false
-  ipv6_cidr_block                                = null
-  ipv6_native                                    = false
-  map_public_ip_on_launch                        = false
-  outpost_arn                                    = null
-  private_dns_hostname_type_on_launch            = "ip-name"
-  tags = {
-    Name = "dbks-infra-dev-private-subnet-2"
-  }
-  tags_all = {
-    Name = "dbks-infra-dev-private-subnet-2"
-  }
-  vpc_id = "vpc-0c0888b82c6975777"
-}
-
-# __generated__ by Terraform from "subnet-04526bd022d251edf/rtb-0e11f517003820532"
-resource "aws_route_table_association" "private_1" {
-  gateway_id     = null
-  route_table_id = "rtb-0e11f517003820532"
-  subnet_id      = "subnet-04526bd022d251edf"
-}
-
-# __generated__ by Terraform
-resource "aws_vpc" "this" {
-  assign_generated_ipv6_cidr_block     = false
-  cidr_block                           = "10.0.0.0/16"
-  enable_dns_hostnames                 = true
-  enable_dns_support                   = true
-  enable_network_address_usage_metrics = false
-  instance_tenancy                     = "default"
-  ipv4_ipam_pool_id                    = null
-  ipv4_netmask_length                  = null
-  ipv6_cidr_block                      = null
-  ipv6_cidr_block_network_border_group = null
-  ipv6_ipam_pool_id                    = null
-  tags = {
-    Name = "dbks-infra"
-  }
-  tags_all = {
-    Name = "dbks-infra"
-  }
 }
 
 # __generated__ by Terraform from "dbks-infra-dev-s3-ws"
