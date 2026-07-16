@@ -42,12 +42,12 @@ resource "aws_iam_policy" "bucket" {
       {
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-        Resource = "arn:aws:s3:::${var.bucket_name}/unity-catalog/*"
+        Resource = "${var.bucket_arn}/unity-catalog/*"
       },
       {
         Effect   = "Allow"
         Action   = ["s3:ListBucket", "s3:GetBucketLocation"]
-        Resource = "arn:aws:s3:::${var.bucket_name}"
+        Resource = var.bucket_arn
       },
       {
         Effect   = "Allow"
@@ -100,4 +100,38 @@ resource "aws_iam_role_policy_attachment" "storage_bucket" {
 resource "aws_iam_role_policy_attachment" "storage_file_events" {
   role       = aws_iam_role.storage.name
   policy_arn = aws_iam_policy.file_events.arn
+}
+
+# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
+resource "aws_s3_bucket_policy" "workspace" {
+  bucket = var.bucket_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Grant Databricks Access"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::414351767826:root"
+        }
+        Action = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketLocation"]
+        Condition = {
+          StringEquals = {
+            "aws:PrincipalTag/DatabricksAccountId" = var.databricks_account_id
+          }
+        }
+        Resource = ["${var.bucket_arn}/*", var.bucket_arn]
+      },
+      {
+        Sid    = "Prevent DBFS from accessing Unity Catalog metastore"
+        Effect = "Deny"
+        Principal = {
+          AWS = "arn:aws:iam::414351767826:root"
+        }
+        Action   = "s3:*"
+        Resource = "${var.bucket_arn}/unity-catalog/*"
+      }
+    ]
+  })
 }
