@@ -15,3 +15,9 @@ module "iam_credential" {
   databricks_account_id = var.databricks_account_id
   role_name             = var.credential_role_name
 }
+
+module "s3_workspace" {
+  source = "../../modules/s3-workspace"
+
+  bucket_name = var.workspace_bucket_name
+}

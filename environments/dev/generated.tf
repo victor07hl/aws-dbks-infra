@@ -1,19 +1,6 @@
 # __generated__ by Terraform
 # Please review these resources and move them into your main configuration files.
 
-# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
-resource "aws_s3_bucket_server_side_encryption_configuration" "workspace" {
-  bucket                = "dbks-infra-dev-s3-ws"
-  expected_bucket_owner = null
-  rule {
-    bucket_key_enabled = true
-    apply_server_side_encryption_by_default {
-      kms_master_key_id = null
-      sse_algorithm     = "AES256"
-    }
-  }
-}
-
 # __generated__ by Terraform from "arn:aws:iam::252231277941:policy/dbks-dev-policy-s3-file-events"
 resource "aws_iam_policy" "file_events" {
   description = "The IAM policy grants Databricks permission to update your buckets event notification configuration, create an SNS topic, create an SQS queue, and subscribe the SQS queue to the SNS topic"
@@ -71,15 +58,6 @@ resource "aws_s3_bucket_policy" "workspace" {
     }]
     Version = "2012-10-17"
   })
-}
-
-# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
-resource "aws_s3_bucket_public_access_block" "workspace" {
-  block_public_acls       = true
-  block_public_policy     = true
-  bucket                  = "dbks-infra-dev-s3-ws"
-  ignore_public_acls      = true
-  restrict_public_buckets = true
 }
 
 # __generated__ by Terraform from "dbks-dev-trust-role-ws"
@@ -148,23 +126,3 @@ resource "aws_iam_role_policy_attachment" "storage_bucket" {
   role       = "dbks-dev-trust-role-ws"
 }
 
-# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
-resource "aws_s3_bucket" "workspace" {
-  bucket              = "dbks-infra-dev-s3-ws"
-  bucket_prefix       = null
-  force_destroy       = null
-  object_lock_enabled = false
-  tags                = {}
-  tags_all            = {}
-}
-
-# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
-resource "aws_s3_bucket_versioning" "workspace" {
-  bucket                = "dbks-infra-dev-s3-ws"
-  expected_bucket_owner = null
-  mfa                   = null
-  versioning_configuration {
-    mfa_delete = null
-    status     = "Disabled"
-  }
-}
