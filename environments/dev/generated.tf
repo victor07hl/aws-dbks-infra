@@ -2,19 +2,6 @@
 # Please review these resources and move them into your main configuration files.
 
 # __generated__ by Terraform from "dbks-infra-dev-s3-ws"
-resource "aws_s3_bucket_server_side_encryption_configuration" "workspace" {
-  bucket                = "dbks-infra-dev-s3-ws"
-  expected_bucket_owner = null
-  rule {
-    bucket_key_enabled = true
-    apply_server_side_encryption_by_default {
-      kms_master_key_id = null
-      sse_algorithm     = "AES256"
-    }
-  }
-}
-
-# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
 resource "aws_s3_bucket_policy" "workspace" {
   bucket = "dbks-infra-dev-s3-ws"
   policy = jsonencode({
@@ -42,34 +29,4 @@ resource "aws_s3_bucket_policy" "workspace" {
     }]
     Version = "2012-10-17"
   })
-}
-
-# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
-resource "aws_s3_bucket_public_access_block" "workspace" {
-  block_public_acls       = true
-  block_public_policy     = true
-  bucket                  = "dbks-infra-dev-s3-ws"
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
-resource "aws_s3_bucket" "workspace" {
-  bucket              = "dbks-infra-dev-s3-ws"
-  bucket_prefix       = null
-  force_destroy       = null
-  object_lock_enabled = false
-  tags                = {}
-  tags_all            = {}
-}
-
-# __generated__ by Terraform from "dbks-infra-dev-s3-ws"
-resource "aws_s3_bucket_versioning" "workspace" {
-  bucket                = "dbks-infra-dev-s3-ws"
-  expected_bucket_owner = null
-  mfa                   = null
-  versioning_configuration {
-    mfa_delete = null
-    status     = "Disabled"
-  }
 }

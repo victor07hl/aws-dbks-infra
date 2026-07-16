@@ -22,3 +22,9 @@ module "iam_storage" {
   databricks_account_id = var.databricks_account_id
   role_name             = var.storage_role_name
 }
+
+module "s3_workspace" {
+  source = "../../modules/s3-workspace"
+
+  bucket_name = var.workspace_bucket_name
+}

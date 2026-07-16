@@ -51,3 +51,9 @@ variable "storage_role_name" {
   type        = string
   default     = "dbks-dev-trust-role-ws"
 }
+
+variable "workspace_bucket_name" {
+  description = "Name of the per-environment workspace S3 bucket"
+  type        = string
+  default     = "dbks-infra-dev-s3-ws"
+}
