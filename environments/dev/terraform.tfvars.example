@@ -1,0 +1,16 @@
+# Safe template for environments/dev/terraform.tfvars — copy and edit locally.
+# Real values are gitignored (*.tfvars); this file is committed and contains no secrets.
+#
+# All variables below already have defaults in variables.tf matching the
+# documented dev topology (docs/architecture/network-topology.md), so this
+# file is optional for dev — only needed if you want to override a value
+# locally without touching variables.tf.
+
+environment = "dev"
+region      = "us-east-2"
+
+vpc_cidr = "10.0.0.0/16"
+azs      = ["us-east-2a", "us-east-2b"]
+
+public_subnet_cidrs  = ["10.0.0.0/24"]
+private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]

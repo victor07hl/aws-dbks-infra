@@ -134,8 +134,8 @@ GitHub Actions CI/CD pipeline definitions. All files use YAML format.
 
 | File | Extension | Trigger | Purpose |
 |------|-----------|---------|---------|
-| `plan-dev.yml` | `.yml` | Push to `dev` branch | Runs `terraform plan` against the dev environment |
-| `apply-dev.yml` | `.yml` | Merge to `dev` branch | Runs `terraform apply` against the dev environment |
+| `plan-dev.yml` | `.yml` | PR opened targeting `dev` | Runs `terraform plan` against the dev environment |
+| `apply-dev.yml` | `.yml` | Push to `dev` branch | Runs `terraform apply` against the dev environment |
 | `plan-prod.yml` | `.yml` | PR opened targeting `main` | Runs `terraform plan` against the prod environment |
 | `apply-prod.yml` | `.yml` | Merge to `main` branch | Runs `terraform apply` against the prod environment |
 
@@ -176,5 +176,6 @@ Project documentation in Markdown format.
 - Never hardcode credentials — use `terraform.tfvars` (gitignored) or environment variables.
 - Always run `terraform plan` before `terraform apply`.
 - All changes flow through: `feature branch → dev → main`.
-- State files (`*.tfstate`) are gitignored; remote state is managed via S3 + DynamoDB.
+- State files (`*.tfstate`) are gitignored; remote state is managed via S3 with native locking (`use_lockfile = true`, Terraform ≥ 1.10) — no DynamoDB.
+- Every root-module variable in `environments/{dev,prod}` needs a `default`, since no CI workflow passes `-var-file`/`-var` (see `plan-dev.yml`/`apply-dev.yml`/etc.) — `terraform.tfvars` is local-only and gitignored.
 - See [naming-conventions.md](naming-conventions.md) for resource naming rules.
