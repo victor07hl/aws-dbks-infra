@@ -15,3 +15,10 @@ module "iam_credential" {
   databricks_account_id = var.databricks_account_id
   role_name             = var.credential_role_name
 }
+
+module "iam_storage" {
+  source = "../../modules/iam-storage"
+
+  databricks_account_id = var.databricks_account_id
+  role_name             = var.storage_role_name
+}
