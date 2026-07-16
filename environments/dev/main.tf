@@ -8,3 +8,10 @@ module "network" {
   public_subnet_cidrs  = var.public_subnet_cidrs
   private_subnet_cidrs = var.private_subnet_cidrs
 }
+
+module "iam_credential" {
+  source = "../../modules/iam-credential"
+
+  databricks_account_id = var.databricks_account_id
+  role_name             = var.credential_role_name
+}
