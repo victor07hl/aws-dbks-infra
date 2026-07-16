@@ -56,6 +56,8 @@ terraform fmt -check -recursive
 - Always run terraform plan before apply
 - All changes go through a ticket-named feature branch → dev → main. Feature branches are named `IT_<n>_branch` (e.g. `IT_21_branch`); every promotion is a PR requiring ≥1 approving review. See "Branch and Deployment Strategy" in `docs/terraform-setup-aws.md`. Note: these PR rules are a team convention, not GitHub-enforced (private repo on the Free plan)
 - Follow naming conventions in `docs/naming-conventions.docx`
+- Every root-module variable in `environments/{dev,prod}` must have a `default`, or the relevant GitHub Actions workflow must be updated to supply it. None of the four workflows (`plan-dev.yml`, `apply-dev.yml`, `plan-prod.yml`, `apply-prod.yml`) pass `-var-file`/`-var`/`TF_VAR_*` — `terraform.tfvars` is gitignored and never present on CI runners. A required variable with no default hangs `plan`/`apply` in CI (Terraform waits on interactive input with no TTY) until GitHub kills the job hours later, and can leave stale S3 native-locking lock objects behind (`terraform force-unlock <id>` to clear)
+- When moving an already-applied resource into (or out of) a module — e.g. modularizing the remaining flat resources in `generated.tf` (IAM, S3) the same way `modules/network` was done — always reconcile with `terraform state mv <old_address> <new_address>` for each resource before merging. Editing the `.tf` files alone doesn't move state, so `plan` will otherwise show a full destroy+recreate instead of a no-op
 
 `*.tfvars` and `*.tfvars.json` files are gitignored and contain sensitive values — never commit them. Runtime credentials (Databricks PAT, account client secret, etc.) must live in Secrets Manager, not in tfvars.
 
