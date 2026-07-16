@@ -15,9 +15,13 @@ variable "role_description" {
 }
 
 variable "bucket_name" {
-  description = "Name of the workspace S3 bucket this role is granted read/write access to"
+  description = "Name of the workspace S3 bucket this role is granted read/write access to, sourced from module.s3_workspace.bucket_name"
   type        = string
-  default     = "dbks-infra-dev-s3-ws"
+}
+
+variable "bucket_arn" {
+  description = "ARN of the workspace S3 bucket, sourced from module.s3_workspace.bucket_arn"
+  type        = string
 }
 
 variable "bucket_policy_name" {
