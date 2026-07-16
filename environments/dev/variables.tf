@@ -46,6 +46,12 @@ variable "credential_role_name" {
   default     = "dbks-infra-dev-ws-role"
 }
 
+variable "storage_role_name" {
+  description = "Name of the Unity Catalog self-assuming storage trust role"
+  type        = string
+  default     = "dbks-dev-trust-role-ws"
+}
+
 variable "workspace_bucket_name" {
   description = "Name of the per-environment workspace S3 bucket"
   type        = string
