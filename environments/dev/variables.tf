@@ -45,3 +45,9 @@ variable "credential_role_name" {
   type        = string
   default     = "dbks-infra-dev-ws-role"
 }
+
+variable "storage_role_name" {
+  description = "Name of the Unity Catalog self-assuming storage trust role"
+  type        = string
+  default     = "dbks-dev-trust-role-ws"
+}
