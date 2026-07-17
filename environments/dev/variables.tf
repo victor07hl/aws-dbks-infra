@@ -57,3 +57,15 @@ variable "workspace_bucket_name" {
   type        = string
   default     = "dbks-infra-dev-s3-ws"
 }
+
+variable "databricks_secret_name" {
+  description = "Name of the Secrets Manager secret holding the Databricks OAuth M2M service-principal credentials"
+  type        = string
+  default     = "dbks-infra-dev-sm-databricks-m2m"
+}
+
+variable "databricks_secret_kms_alias" {
+  description = "Alias of the CMK used to encrypt the Databricks OAuth M2M secret"
+  type        = string
+  default     = "alias/dbks-infra-dev-kms-sm"
+}
