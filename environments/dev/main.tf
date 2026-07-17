@@ -30,3 +30,10 @@ module "iam_storage" {
   bucket_name           = module.s3_workspace.bucket_name
   bucket_arn            = module.s3_workspace.bucket_arn
 }
+
+module "secrets_databricks_auth" {
+  source = "../../modules/secrets-databricks-auth"
+
+  secret_name = var.databricks_secret_name
+  kms_alias   = var.databricks_secret_kms_alias
+}

@@ -949,6 +949,60 @@ If any of these fail, walk back to the section listed in Appendix B.
 
 ---
 
+# Part 9 — Databricks OAuth M2M service-principal bootstrap
+
+IT-60 adds `modules/secrets-databricks-auth`, which creates an empty
+Secrets Manager container (with a `"REPLACE_ME"` placeholder version, so
+`terraform plan`/`apply` never breaks on a secret with zero versions) for
+the OAuth M2M credentials the account-level `provider "databricks"` block
+(alias `account`, in `environments/dev/providers.tf`) reads. Terraform
+never sees the real value — it's populated out-of-band, same bootstrap
+pattern as the SSO/OIDC setup in Parts 2–4.
+
+### Step 9.1 — Create the service principal
+
+In the Databricks account console: **User management** → **Service
+principals** → **Add service principal**. Generate an OAuth secret for
+it — Databricks shows the `client_secret` exactly once, so copy it
+immediately.
+
+### Step 9.2 — Populate the secret
+
+Run once `terraform apply` has created the placeholder (Step 9.1's
+`client_id`/`client_secret` go in the JSON below):
+
+```bash
+aws secretsmanager put-secret-value \
+  --secret-id dbks-infra-dev-sm-databricks-m2m \
+  --secret-string '{"client_id":"<client_id>","client_secret":"<client_secret>"}'
+```
+
+The module's `aws_secretsmanager_secret_version` resource has
+`lifecycle { ignore_changes = [secret_string] }`, so future
+`terraform apply` runs will never revert this write back to the
+placeholder.
+
+### CI IAM — no change needed
+
+`dbks-infra-iam-role-gha-deploy`'s existing inline policy (**Table
+2.2**, Step 2.2) already grants `secretsmanager:*` and `kms:*` on
+`Resource: "*"`, scoped by the `aws:ResourceTag/Project =
+aws-dbks-infra` condition. Every resource in this repo inherits
+`Project = aws-dbks-infra` via `default_tags` (Step 7.3), so the new
+secret and CMK are covered automatically — `plan-dev.yml`/
+`apply-dev.yml` need no policy change.
+
+### Known gap — rotation
+
+CLAUDE.md's security baseline calls for CMK + automatic rotation on
+all Secrets Manager secrets. This one is exempted for now: it's a
+manually-managed OAuth credential, and automatic rotation would need a
+custom rotation Lambda that also rotates the corresponding secret on
+the Databricks side — out of scope for landing the auth plumbing.
+Track as a follow-up ticket before this goes to prod.
+
+---
+
 # Appendix A — Resource name reference
 
 | Layer | Resource | Name |
