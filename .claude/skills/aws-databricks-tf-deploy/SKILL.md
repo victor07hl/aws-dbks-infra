@@ -29,11 +29,11 @@ terraform {
 Always deploy resources in this dependency order:
 1. **AWS VPC + networking** — VPC, subnets, route tables, IGW, NAT GW, NACL, DHCP option set (per `docs/architecture/network-topology.md`)
 2. **AWS IAM** — cross-account role for Databricks control plane
-3. **AWS S3 metastore** — single bucket for Unity Catalog metastore-level managed storage
+3. **AWS S3 workspace bucket** — one bucket per environment; holds workspace artifacts AND (since the metastore has no `storage_root`) Unity Catalog managed data under `/unity-catalog/*`
 4. **Databricks credential config** — references the IAM role ARN
 5. **Databricks network config** (`databricks_mws_networks`) — references VPC ID and the two private subnet IDs
-6. **Databricks workspace** (`databricks_mws_workspaces`) — references credential config + network config (workspace-root bucket deferred for this iteration)
-7. **Metastore** (`databricks_metastore`) — point `storage_root` at the S3 metastore bucket
+6. **Databricks workspace** (`databricks_mws_workspaces`) — references credential config + network config + the workspace bucket from step 3
+7. **Metastore** (`databricks_metastore`) — no `storage_root` (project decision); UC managed data lands in each workspace's own bucket
 8. **Metastore assignment** — bind metastore to each workspace
 9. **Catalog + workspace binding** — create catalog (inherits storage from metastore), bind to workspace
 
@@ -43,15 +43,15 @@ Always deploy resources in this dependency order:
 |----------|---------|
 | `databricks_mws_credentials` | Cross-account IAM role registration |
 | `databricks_mws_workspaces` | Workspace provisioning |
-| `databricks_metastore` | Unity Catalog metastore (one per region) — `storage_root` points at the S3 metastore bucket |
+| `databricks_metastore` | Unity Catalog metastore (one per region) — no `storage_root` configured; UC managed data lands in the workspace bucket |
 | `databricks_metastore_assignment` | Bind metastore to workspace |
 | `databricks_catalog` | Unity Catalog catalog (inherits managed storage from metastore) |
 | `databricks_catalog_workspace_binding` | Bind catalog to a specific workspace |
 
 ### Project scope notes (current iteration)
-- Only 2 S3 buckets in scope: `dbks-infra-s3-tf-state` (no encryption) and `dbks-infra-s3-metastore`.
-- `databricks_mws_storage_configurations` and per-workspace root buckets are deferred — revisit when workspace provisioning is enabled.
-- Metastore-level `storage_root` is used (not catalog-level). Databricks' current recommendation prefers catalog-level for data isolation, but this project opts for the simpler metastore-level model for now.
+- S3 buckets: `dbks-infra-s3-tf-state` (no encryption, shared) plus one `dbks-infra-{env}-s3-ws` per environment — no separate metastore bucket.
+- The metastore has no `storage_root` at all — UC managed data lands in each workspace's own bucket under `/unity-catalog/*`, with a bucket policy `Deny` on that prefix for the Databricks root principal to block legacy DBFS access.
+- AWS-side prerequisites (network, IAM, S3, secrets) are implemented via `modules/network`, `modules/iam-credential`, `modules/s3-workspace`, `modules/iam-storage`, `modules/secrets-databricks-auth`; the Databricks-side resources (`databricks_mws_workspaces`, `databricks_metastore`, catalog) are not yet wired into `environments/dev/main.tf`.
 
 ### Network topology (dev) — must match `docs/architecture/network-topology.md`
 
@@ -151,7 +151,7 @@ resource "aws_s3_bucket_policy" "workspace_root" {
 - Always enable autoscaling with `min_workers` / `max_workers`.
 - Use secrets management (`databricks_secret_scope`, `databricks_secret`) — never hardcode tokens.
 - Store sensitive values in `terraform.tfvars` (gitignored).
-- Use remote state (S3 + DynamoDB) for all shared environments.
+- Use remote state (S3, native locking via `use_lockfile = true`, Terraform ≥ 1.10) for all shared environments — no DynamoDB lock table (project decision).
 - Run `terraform plan` before every `apply`.
 
 ---
@@ -198,5 +198,5 @@ Provisioning → Failed    ✗ check IAM role, S3 policy, VPC config
 - **Metastore**: one, in `us-east-2`, shared across workspaces
 - **Workspaces**: `dev` (branch: `dev`) and `prod` (branch: `main`)
 - **Catalogs**: `dev` bound to workspace-dev, `prod` bound to workspace-prod
-- **State**: remote state via S3 + DynamoDB per environment
+- **State**: remote state via S3 per environment, S3 native locking (`use_lockfile = true`) — no DynamoDB
 - **CI/CD**: GitHub Actions — plan on PR, apply on merge

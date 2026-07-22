@@ -91,23 +91,23 @@ Outbound:
 ### Rules
 - Always use self-referencing security group rules for cluster communication
 - Never open SSH (port 22) to 0.0.0.0/0
-- Use VPC endpoints for S3 and DynamoDB to avoid NAT costs
+- Use a VPC endpoint for S3 to avoid NAT costs
 
 ---
 
 ## S3 bucket design
 
-### Buckets needed for this project (minimal — current iteration)
-Follow `docs/naming-conventions.docx`. This project intentionally starts with only 2 S3 buckets; workspace-root and per-catalog buckets are deferred.
+### Buckets needed for this project
+Follow `docs/naming-conventions.docx`. Two buckets: a shared TF state bucket, plus one workspace bucket per environment. No separate metastore bucket.
 
 ```
 dbks-infra-s3-tf-state                  # Terraform remote state — NO explicit encryption (project decision)
-dbks-infra-s3-metastore                 # Unity Catalog metastore-level managed storage (shared — one metastore per region)
+dbks-infra-{env}-s3-ws                  # Per-env workspace bucket — holds workspace artifacts AND UC managed data under /unity-catalog/*
 ```
 
 ### Scope notes
-- No workspace-root buckets for now. If Databricks workspaces are provisioned later, each will need its own root bucket.
-- No per-catalog or per-schema managed-storage buckets. All UC managed data lands in the single metastore bucket (inherited from metastore-level `storage_root`). This is simpler but less flexible than catalog-level storage — revisit when dev/prod data isolation becomes a requirement.
+- No separate metastore bucket. The metastore is provisioned with no `storage_root`; UC managed data lands in each workspace's own bucket under `/unity-catalog/*`, with a bucket policy `Deny` on that prefix for the Databricks root principal to block legacy DBFS access.
+- No per-catalog or per-schema managed-storage buckets — catalogs inherit storage from the workspace bucket via the metastore/UC binding.
 - `dbks-infra-s3-tf-state` is explicitly created without an `aws_s3_bucket_server_side_encryption_configuration` block. AWS applies default SSE-S3 automatically; KMS CMK encryption is intentionally not used here.
 
 ### Mandatory settings for every bucket
@@ -197,29 +197,21 @@ data "aws_iam_policy_document" "github_actions_trust" {
 All role names must follow `docs/naming-conventions.docx`:
 
 ```
-dbks-infra-iam-role-gha-deploy           # GitHub Actions CI/CD (shared, OIDC trust)
-dbks-infra-{env}-iam-role-cross-account  # Databricks control plane access per env
-dbks-infra-{env}-iam-role-uc-storage     # Unity Catalog S3 access per env
+dbks-infra-iam-role-gha-deploy       # GitHub Actions CI/CD (shared, OIDC trust)
+dbks-infra-{env}-ws-role             # Databricks control plane / EC2 compute credential per env (modules/iam-credential)
+dbks-{env}-trust-role-ws             # Unity Catalog storage trust role per env, self-assuming (modules/iam-storage)
 ```
 
 ---
 
 ## VPC endpoints
 
-Always create VPC endpoints for these services to avoid NAT Gateway costs:
+Always create a VPC endpoint for S3 to avoid NAT Gateway costs. This project has no DynamoDB usage (state locking is S3-native, `use_lockfile = true`), so no DynamoDB endpoint is needed:
 ```hcl
 # S3 Gateway endpoint (free)
 resource "aws_vpc_endpoint" "s3" {
   vpc_id       = aws_vpc.this.id
   service_name = "com.amazonaws.${var.region}.s3"
-  vpc_endpoint_type = "Gateway"
-  route_table_ids = [aws_route_table.private.id]
-}
-
-# DynamoDB Gateway endpoint (free)
-resource "aws_vpc_endpoint" "dynamodb" {
-  vpc_id       = aws_vpc.this.id
-  service_name = "com.amazonaws.${var.region}.dynamodb"
   vpc_endpoint_type = "Gateway"
   route_table_ids = [aws_route_table.private.id]
 }
@@ -238,9 +230,8 @@ Never store credentials in `.tf` files, `terraform.tfvars`, or CI environment va
 
 ### Secrets needed for this project
 ```
-dbks-infra-{env}-sm-account-creds      # Databricks account SP client_id + client_secret
-dbks-infra-{env}-sm-workspace-pat      # Databricks workspace PAT (automation)
-dbks-infra-sm-metastore-admin          # Unity Catalog metastore admin creds (shared)
+dbks-infra-{env}-sm-databricks-m2m     # Databricks OAuth M2M service-principal client_id + client_secret,
+                                        # per env, dedicated CMK (modules/secrets-databricks-auth)
 ```
 
 ### Mandatory settings
@@ -263,6 +254,8 @@ resource "aws_secretsmanager_secret_rotation" "this" {
 - Enable automatic rotation (max 90 days) for all machine credentials
 - Read secrets at runtime via `data "aws_secretsmanager_secret_version"` — never hardcode values
 - Scope `secretsmanager:GetSecretValue` to specific secret ARNs in IAM policies (no wildcards)
+
+> **Current project exception:** `dbks-infra-{env}-sm-databricks-m2m` has no `aws_secretsmanager_secret_rotation` yet — the value is populated manually out-of-band (`docs/terraform-setup-aws.md` Part 9), and automatic rotation would need a custom Lambda that also rotates the corresponding secret on the Databricks side. Tracked as a follow-up before this goes to prod — don't auto-add rotation to this specific secret without that Lambda.
 
 ---
 
@@ -334,7 +327,7 @@ Before finalizing any design verify:
 - [ ] Public route table routes 0.0.0.0/0 → IGW; private route table routes 0.0.0.0/0 → NAT GW
 - [ ] Main NACL outbound allows Databricks ports 443, 3306, 8443, 8444, 8445
 - [ ] DHCP option set uses AmazonProvidedDNS (Databricks requires DNS resolution)
-- [ ] S3 + DynamoDB Gateway VPC endpoints created (free)
+- [ ] S3 Gateway VPC endpoint created (free)
 - [ ] Secrets Manager + STS Interface VPC endpoints created
 - [ ] Security groups have self-referencing rules
 - [ ] No 0.0.0.0/0 on inbound rules except load balancers
@@ -360,13 +353,13 @@ Before finalizing any design verify:
 - NAT Gateway: dev runs a single NAT (`dbks-infra-dev-NATG`) in `dbks-infra-dev-public-subnet` for cost reasons — accept single-AZ NAT failure risk in dev. For prod, deploy one NAT per AZ.
 - Private subnets span 2 AZs (us-east-2a, us-east-2b) so Databricks can place cluster nodes in either AZ even with the single-NAT egress.
 - S3: always cross-region replication for prod state bucket
-- DynamoDB: on-demand billing for lock table (no capacity planning needed)
+- State locking: S3 native (`use_lockfile = true`, Terraform ≥ 1.10) — no DynamoDB lock table
 
 ---
 
 ## Cost optimization rules
 
-- Use S3 + DynamoDB VPC endpoints (Gateway type — free)
+- Use the S3 VPC endpoint (Gateway type — free)
 - Use single NAT Gateway for dev environment
 - Use two NAT Gateways for prod (one per AZ)
 - Tag all resources for cost allocation
@@ -382,7 +375,7 @@ Before finalizing any design verify:
 - Never create IAM users with programmatic access — use roles and OIDC
 - Never open port 22 (SSH) to 0.0.0.0/0
 - Never create S3 buckets without encryption and public access block
-- Never skip VPC endpoints for S3 and DynamoDB
+- Never skip the VPC endpoint for S3
 - Never store credentials in `.tf`, `terraform.tfvars`, or CI env vars — use Secrets Manager
 - Never use the default `aws/secretsmanager` or `aws/s3` KMS keys for sensitive data — always CMK
 - Never disable CloudTrail or disable key rotation on KMS CMKs

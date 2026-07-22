@@ -297,8 +297,8 @@
         <mxCell id="st-tfstate-bucket" value="dbks-infra-s3-tf-state&#xa;Region: us-east-2&#xa;Encryption: default SSE-S3&#xa;(no explicit block — project decision)&#xa;Versioning: ON&#xa;Public access: BLOCKED" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#7AA116;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;verticalLabelPosition=bottom;verticalAlign=top;" parent="1" vertex="1">
           <mxGeometry x="170" y="180" width="78" height="78" as="geometry" />
         </mxCell>
-        <mxCell id="st-ddb-lock" value="dbks-infra-tf-state-lock&#xa;DynamoDB lock table&#xa;On-demand billing&#xa;LockID (HASH)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#3334B9;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;verticalLabelPosition=bottom;verticalAlign=top;" parent="1" vertex="1">
-          <mxGeometry x="170" y="430" width="78" height="78" as="geometry" />
+        <mxCell id="st-lock-note" value="State locking: S3 native locking&#xa;(use_lockfile = true, Terraform &#8805; 1.10)&#xa;No DynamoDB lock table" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#3334B9;fontSize=10;align=center;spacingTop=8" parent="1" vertex="1">
+          <mxGeometry x="130" y="440" width="220" height="60" as="geometry" />
         </mxCell>
         <mxCell id="st-shared-note" value="Per env state key:&#xa;envs/dev/terraform.tfstate&#xa;envs/prod/terraform.tfstate" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;fontSize=10;align=center" parent="1" vertex="1">
           <mxGeometry x="100" y="630" width="280" height="60" as="geometry" />
@@ -318,7 +318,10 @@
         <mxCell id="st-dev-policy-note" value="Bucket policy on dbks-infra-dev-s3-ws:&#xa;• Allow s3:Get/Put/List/Delete to 414351767826:root&#xa;  with aws:PrincipalTag/DatabricksAccountId == &lt;dba_acct&gt;&#xa;• Deny s3:* on /unity-catalog/* (prevents DBFS leakage)&#xa;Metastore has NO storage_root — UC managed data lands here." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#147EBA;fontSize=10;align=left;spacingLeft=10;spacingTop=8" parent="1" vertex="1">
           <mxGeometry x="500" y="540" width="370" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="st-dev-status" value="Status: deployed manually (IT-15 in progress)" style="text;html=1;align=center;fontColor=#0D47A1;fontSize=10;fontStyle=2" parent="1" vertex="1">
+        <mxCell id="st-dev-secret" value="dbks-infra-dev-sm-databricks-m2m&#xa;Secrets Manager: OAuth M2M service-principal creds&#xa;Encrypted by dbks-infra-dev-kms-sm (dedicated CMK)&#xa;Consumed by account-level databricks provider (alias=account)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DD344C;fontSize=10;align=left;spacingLeft=10;spacingTop=8" parent="1" vertex="1">
+          <mxGeometry x="480" y="250" width="390" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="st-dev-status" value="Status: deployed via Terraform (network, iam-credential, s3-workspace, iam-storage, secrets-databricks-auth)" style="text;html=1;align=center;fontColor=#0D47A1;fontSize=10;fontStyle=2" parent="1" vertex="1">
           <mxGeometry x="500" y="690" width="370" height="20" as="geometry" />
         </mxCell>
         <mxCell id="st-prod-lane" value="PROD environment (planned)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F1F8E9;strokeColor=#558B2F;dashed=1;verticalAlign=top;fontSize=12;fontStyle=1;fontColor=#33691E;align=center;spacingTop=8" parent="1" vertex="1">
@@ -336,11 +339,14 @@
         <mxCell id="st-prod-policy-note" value="Same bucket policy as dev, with CRR enabled for DR.&#xa;Metastore has NO storage_root — UC managed data lands here." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#558B2F;fontSize=10;align=left;spacingLeft=10;spacingTop=8" parent="1" vertex="1">
           <mxGeometry x="950" y="540" width="370" height="80" as="geometry" />
         </mxCell>
+        <mxCell id="st-prod-secret" value="dbks-infra-prod-sm-databricks-m2m&#xa;Secrets Manager: OAuth M2M service-principal creds&#xa;Encrypted by dbks-infra-prod-kms-sm (dedicated CMK)&#xa;Not yet provisioned (prod environment not deployed)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#558B2F;fontSize=10;align=left;spacingLeft=10;spacingTop=8;dashed=1" parent="1" vertex="1">
+          <mxGeometry x="930" y="250" width="390" height="90" as="geometry" />
+        </mxCell>
         <mxCell id="st-prod-status" value="Status: not yet deployed" style="text;html=1;align=center;fontColor=#33691E;fontSize=10;fontStyle=2" parent="1" vertex="1">
           <mxGeometry x="950" y="680" width="370" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="st-legend" value="Legend&#xa;• Green icons = S3 buckets (one workspace bucket per env — holds workspace artifacts AND UC managed data)&#xa;• Red boxes = KMS CMK (one per env)&#xa;• Blue icon = DynamoDB lock table&#xa;• Dashed red lines = encrypted by CMK&#xa;• tf-state intentionally uses default SSE-S3 (no explicit KMS) — project decision&#xa;• No metastore-level bucket: metastore has NO storage_root, UC managed data lives in the workspace bucket under /unity-catalog/*" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;spacingTop=8;fontSize=10" parent="1" vertex="1">
-          <mxGeometry x="40" y="800" width="1320" height="80" as="geometry" />
+        <mxCell id="st-legend" value="Legend&#xa;• Green icons = S3 buckets (one workspace bucket per env — holds workspace artifacts AND UC managed data)&#xa;• Red boxes = KMS CMK (one per env for S3/SM/CW/EBS, plus a dedicated CMK per env for the Databricks OAuth M2M secret)&#xa;• Dashed red lines = encrypted by CMK&#xa;• State locking is S3 native (use_lockfile = true, Terraform &#8805; 1.10) — no DynamoDB lock table&#xa;• tf-state intentionally uses default SSE-S3 (no explicit KMS) — project decision&#xa;• No metastore-level bucket: metastore has NO storage_root, UC managed data lives in the workspace bucket under /unity-catalog/*" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;spacingTop=8;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="40" y="800" width="1320" height="90" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
@@ -430,7 +436,7 @@
         <mxCell id="ci-repo" value="GitHub repo&#xa;victor07hl/aws-dbks-infra" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#24292E;strokeColor=#000000;fontColor=#FFFFFF;fontSize=11;fontStyle=1" parent="1" vertex="1">
           <mxGeometry x="160" y="100" width="220" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="ci-branch-feature" value="branch: feature/*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#0277BD;fontSize=10" parent="1" vertex="1">
+        <mxCell id="ci-branch-feature" value="branch: IT_&lt;n&gt;_branch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#0277BD;fontSize=10" parent="1" vertex="1">
           <mxGeometry x="160" y="170" width="220" height="40" as="geometry" />
         </mxCell>
         <mxCell id="ci-branch-dev" value="branch: dev (DEV env)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;fontSize=10" parent="1" vertex="1">
@@ -439,20 +445,17 @@
         <mxCell id="ci-branch-main" value="branch: main (PROD env)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=10" parent="1" vertex="1">
           <mxGeometry x="160" y="310" width="220" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="ci-wf-pr" value="GHA workflow&#xa;pr-validate.yml&#xa;• fmt&#xa;• validate&#xa;• plan (dev)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FB8C00;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;spacingTop=6" parent="1" vertex="1">
+        <mxCell id="ci-wf-pr" value="GHA workflows&#xa;plan-dev.yml (PR &#8594; dev)&#xa;plan-prod.yml (PR &#8594; main)&#xa;• terraform init&#xa;• terraform plan&#xa;(no fmt/validate step)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FB8C00;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;spacingTop=6" parent="1" vertex="1">
           <mxGeometry x="450" y="150" width="200" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="ci-wf-dev" value="GHA workflow&#xa;deploy-dev.yml&#xa;• plan&#xa;• apply&#xa;(triggered: push to dev)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F9A825;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;spacingTop=6" parent="1" vertex="1">
+        <mxCell id="ci-wf-dev" value="GHA workflow&#xa;apply-dev.yml&#xa;• terraform init&#xa;• terraform apply -auto-approve&#xa;(triggered: push to dev)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F9A825;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;spacingTop=6" parent="1" vertex="1">
           <mxGeometry x="450" y="270" width="200" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="ci-wf-prod" value="GHA workflow&#xa;deploy-prod.yml&#xa;• plan&#xa;• MANUAL APPROVAL&#xa;• apply&#xa;(triggered: push to main)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1B5E20;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;spacingTop=6" parent="1" vertex="1">
+        <mxCell id="ci-wf-prod" value="GHA workflow&#xa;apply-prod.yml&#xa;• terraform init&#xa;• terraform apply -auto-approve&#xa;(triggered: push to main)&#xa;No GitHub Environment gate configured" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1B5E20;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;spacingTop=6" parent="1" vertex="1">
           <mxGeometry x="450" y="390" width="200" height="120" as="geometry" />
         </mxCell>
         <mxCell id="ci-oidc-role" value="dbks-infra-iam-role-gha-deploy&#xa;Assumed via OIDC&#xa;sub: repo:victor07hl/aws-dbks-infra:*" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#DD344C;labelBackgroundColor=#ffffff;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.role;verticalLabelPosition=bottom;verticalAlign=top;" parent="1" vertex="1">
           <mxGeometry x="730" y="290" width="78" height="78" as="geometry" />
-        </mxCell>
-        <mxCell id="ci-approval" value="GitHub Environment&#xa;'prod'&#xa;Required reviewers" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;fontSize=10;fontStyle=1;align=center" parent="1" vertex="1">
-          <mxGeometry x="700" y="430" width="160" height="80" as="geometry" />
         </mxCell>
         <mxCell id="ci-aws-dev" value="AWS DEV (us-east-2)&#xa;envs/dev/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#147EBA;dashed=1;fontSize=11;fontStyle=1;align=center;fontColor=#0D47A1" parent="1" vertex="1">
           <mxGeometry x="900" y="290" width="220" height="80" as="geometry" />
@@ -460,10 +463,10 @@
         <mxCell id="ci-aws-prod" value="AWS PROD (us-east-2)&#xa;envs/prod/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#1B5E20;dashed=1;fontSize=11;fontStyle=1;align=center;fontColor=#1B5E20" parent="1" vertex="1">
           <mxGeometry x="900" y="420" width="220" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="ci-state-dev" value="State backend (dev):&#xa;s3://dbks-infra-s3-tf-state/envs/dev/terraform.tfstate&#xa;DynamoDB lock: dbks-infra-tf-state-lock" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#147EBA;fontSize=9;align=left;spacingLeft=8;spacingTop=4;verticalAlign=top" parent="1" vertex="1">
+        <mxCell id="ci-state-dev" value="State backend (dev):&#xa;s3://dbks-infra-s3-tf-state/envs/dev/terraform.tfstate&#xa;Locking: S3 native (use_lockfile)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#147EBA;fontSize=9;align=left;spacingLeft=8;spacingTop=4;verticalAlign=top" parent="1" vertex="1">
           <mxGeometry x="1140" y="290" width="220" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="ci-state-prod" value="State backend (prod):&#xa;s3://dbks-infra-s3-tf-state/envs/prod/terraform.tfstate&#xa;DynamoDB lock: dbks-infra-tf-state-lock" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1B5E20;fontSize=9;align=left;spacingLeft=8;spacingTop=4;verticalAlign=top" parent="1" vertex="1">
+        <mxCell id="ci-state-prod" value="State backend (prod):&#xa;s3://dbks-infra-s3-tf-state/envs/prod/terraform.tfstate&#xa;Locking: S3 native (use_lockfile)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1B5E20;fontSize=9;align=left;spacingLeft=8;spacingTop=4;verticalAlign=top" parent="1" vertex="1">
           <mxGeometry x="1140" y="420" width="220" height="80" as="geometry" />
         </mxCell>
         <mxCell id="ci-e1" value="push" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0277BD;strokeWidth=2;fontSize=10;fontColor=#0277BD;exitX=1;exitY=0.5;entryX=0;entryY=0.5;exitDx=0;exitDy=0;entryDx=0;entryDy=0" parent="1" source="ci-dev-actor" target="ci-branch-feature" edge="1">
@@ -481,10 +484,7 @@
         <mxCell id="ci-e5" value="OIDC AssumeRole" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#DD344C;strokeWidth=2;fontSize=10;fontColor=#DD344C;exitX=1;exitY=0.5;entryX=0;entryY=0.5;exitDx=0;exitDy=0;entryDx=0;entryDy=0" parent="1" source="ci-wf-dev" target="ci-oidc-role" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="ci-e6" value="needs approval" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#C62828;strokeWidth=2;dashed=1;fontSize=10;fontColor=#C62828;exitX=1;exitY=0.5;entryX=0;entryY=0.5;exitDx=0;exitDy=0;entryDx=0;entryDy=0" parent="1" source="ci-wf-prod" target="ci-approval" edge="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="ci-e7" value="approved → OIDC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#C62828;strokeWidth=2;fontSize=10;fontColor=#C62828;exitX=1;exitY=0.5;entryX=0;entryY=1;exitDx=0;exitDy=0;entryDx=0;entryDy=0" parent="1" source="ci-approval" target="ci-oidc-role" edge="1">
+        <mxCell id="ci-e6" value="OIDC AssumeRole" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#DD344C;strokeWidth=2;fontSize=10;fontColor=#DD344C;exitX=1;exitY=0.5;entryX=0;entryY=1;exitDx=0;exitDy=0;entryDx=0;entryDy=0" parent="1" source="ci-wf-prod" target="ci-oidc-role" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="ci-e8" value="terraform apply" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1D9E75;strokeWidth=2;fontSize=10;fontColor=#0F6E56;exitX=1;exitY=0.5;entryX=0;entryY=0.5;exitDx=0;exitDy=0;entryDx=0;entryDy=0" parent="1" source="ci-oidc-role" target="ci-aws-dev" edge="1">
@@ -505,7 +505,7 @@
         <mxCell id="ci-prom2" value="PR dev → main + review" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#F9A825;strokeWidth=1;dashed=1;fontSize=10;fontColor=#F9A825;exitX=0.5;exitY=1;entryX=0.5;entryY=0;exitDx=0;exitDy=0;entryDx=0;entryDy=0" parent="1" source="ci-branch-dev" target="ci-branch-main" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="ci-steps" value="Pipeline summary&#xa;1. Developer pushes to feature/* → opens PR.&#xa;2. pr-validate.yml runs terraform fmt + validate + plan against DEV state. PR review required.&#xa;3. Merge to dev → deploy-dev.yml plans + applies to AWS DEV via OIDC role dbks-infra-iam-role-gha-deploy.&#xa;4. Open PR dev → main, second review.&#xa;5. Merge to main → deploy-prod.yml plans + waits for GitHub Environment 'prod' approval, then applies to AWS PROD via the same OIDC role.&#xa;6. State + lock are isolated per env (same bucket dbks-infra-s3-tf-state, different keys; same DynamoDB table dbks-infra-tf-state-lock)." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;spacingTop=8;fontSize=10" parent="1" vertex="1">
+        <mxCell id="ci-steps" value="Pipeline summary&#xa;1. Developer pushes to IT_&lt;n&gt;_branch → opens PR into dev.&#xa;2. plan-dev.yml runs terraform init + plan against DEV state on the PR. Review required — team convention, not GitHub-enforced (private repo, Free plan).&#xa;3. Merge to dev → apply-dev.yml runs terraform init + apply -auto-approve against AWS DEV via OIDC role dbks-infra-iam-role-gha-deploy.&#xa;4. Open PR dev → main; plan-prod.yml runs terraform init + plan against PROD state. Second review (same team convention).&#xa;5. Merge to main → apply-prod.yml runs terraform init + apply -auto-approve against AWS PROD via the same OIDC role — no GitHub Environment / required-reviewers gate is configured.&#xa;6. State is isolated per env (same bucket dbks-infra-s3-tf-state, different keys). Locking is S3 native (use_lockfile = true) — no DynamoDB." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;spacingTop=8;fontSize=10" parent="1" vertex="1">
           <mxGeometry x="40" y="640" width="1320" height="200" as="geometry" />
         </mxCell>
       </root>
