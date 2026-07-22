@@ -45,6 +45,10 @@ terraform fmt -check -recursive
 - **`dbks-infra-{env}-s3-ws`** — one bucket per environment that holds **both** workspace artifacts **and** UC managed data under `/unity-catalog/*`. Bucket policy must `Deny s3:*` on `/unity-catalog/*` for the Databricks root principal to block legacy DBFS access.
 - **No separate metastore bucket** — UC managed data lives in the workspace bucket because the metastore has no `storage_root`.
 
+### Auth
+- Databricks OAuth M2M service-principal credentials live in `dbks-infra-{env}-sm-databricks-m2m` (Secrets Manager, per-env CMK, `modules/secrets-databricks-auth`) — Terraform creates the container with a placeholder version (`lifecycle { ignore_changes = [secret_string] }`), the real value is populated out-of-band after manually creating the service principal (`docs/terraform-setup-aws.md` Part 9)
+- Account-level `provider "databricks"` (`alias = "account"`, host `https://accounts.cloud.databricks.com`) reads those credentials via `data "aws_secretsmanager_secret_version"` — never hardcoded
+
 ## Stack
 - Terraform for all infrastructure
 - AWS provider + Databricks provider

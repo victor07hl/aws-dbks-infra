@@ -18,6 +18,7 @@ Terraform infrastructure for Databricks Unity Catalog on AWS. Provisions two iso
 | `modules/iam-credential` | Cross-account IAM role for the Databricks control plane |
 | `modules/s3-workspace` | Per-env workspace bucket (artifacts + UC managed data under `/unity-catalog/*`) |
 | `modules/iam-storage` | Self-assuming UC trust role (`UCMasterRole` + self in trust policy) |
+| `modules/secrets-databricks-auth` | Per-env CMK + Secrets Manager container for Databricks OAuth M2M service-principal credentials, read by the account-level `provider "databricks"` block |
 | `modules/databricks-workspace` | Databricks credential / network / storage configs + `mws_workspace` |
 | `modules/databricks-catalog` | Unity Catalog catalog, schemas, workspace binding |
 | `modules/databricks-cluster` | Reusable cluster compute (all-purpose / job) |
@@ -68,7 +69,7 @@ GitHub Actions workflows run automatically via OIDC-federated IAM (`dbks-infra-i
 |---|---|
 | `docs/naming-conventions.docx` | Authoritative naming rules for all resources |
 | `docs/folder-structure.md` | Directory layout and file purpose |
-| `docs/terraform-setup-aws.md` | Bootstrap runbook: state bucket, IAM roles, OIDC trust |
+| `docs/terraform-setup-aws.md` | Bootstrap runbook: state bucket, IAM roles, OIDC trust, Databricks OAuth M2M service-principal bootstrap (Part 9) |
 | `docs/manual-deployment-findings.md` | Click-by-click manual deploy guide (Parts 1–12); Appendix C is the Terraform module spec |
 | `docs/architecture/network-topology.md` | VPC, subnet, route-table, NACL, NAT, IGW spec |
 | `docs/architecture/aws-infrastructure.drawio` | Multi-page diagram: networking, storage, IAM, CI/CD |
