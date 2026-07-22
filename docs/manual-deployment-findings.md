@@ -53,7 +53,7 @@ running and a new data engineer can log in.
 | 6 | Databricks account console | Network configuration | `dbks-infra-dev-network-config` |
 | 7 | Databricks account console | Storage configuration | `dev-ws-storage` |
 | 8 | Databricks account console | Workspace | `dbks-infra-dev-ws` |
-| 9 | Databricks account console | Unity Catalog metastore + assignment | `dbks-infra-meta-us-east-2` |
+| 9 | Databricks account console | Unity Catalog metastore + assignment | `dbks-infra-meta-us2` |
 | 10 | Workspace SQL editor | Catalog + schemas + workspace binding | `dbks-infra-dev-cat` |
 | 11 | Databricks account console | Service principals + groups | `dbks-infra-dev-sp-*`, `dbks-infra-dev-grp-*` |
 
@@ -389,9 +389,9 @@ into Databricks in Step 5.
 # Part 3 — Workspace S3 bucket
 
 This bucket holds workspace artifacts (notebooks, init scripts, system tables
-data, etc.). Unity Catalog managed data lives in a different bucket
-(`dbks-infra-dev-s3-metastore`) — that one is created when the metastore is
-provisioned.
+data, etc.) **and** Unity Catalog managed data under `/unity-catalog/*`. The
+metastore is provisioned with no `storage_root` (see Part 9), so there is no
+separate metastore bucket — UC managed data lands in this same bucket.
 
 ### Step 3.1 — Create the bucket
 
@@ -696,15 +696,17 @@ In the Databricks account console: **Catalog** → **Create metastore**. Fill in
 
 | Field | Value |
 |---|---|
-| Name | `dbks-infra-meta-us-east-2` |
+| Name | `dbks-infra-meta-us2` |
 | Region | `us-east-2` |
-| `storage_root` | `s3://dbks-infra-dev-s3-metastore/` |
+| `storage_root` | leave **blank** — not configured (project decision) |
 | Storage credential | `dbks-dev-trust-role-ws` (the role from Part 4) |
 
-> The `dbks-infra-dev-s3-metastore` bucket is a separate bucket that backs
-> Unity Catalog managed data. Create it the same way as Part 3 (same
-> versioning, encryption, public-access settings); its bucket policy can be
-> the same as Table 3.2 with the bucket name swapped.
+> No `storage_root` means the metastore has no bucket of its own. Unity
+> Catalog managed data instead lands in each workspace's own bucket
+> (`dbks-infra-{env}-s3-ws`) under `/unity-catalog/*`, via the storage
+> credential's access to that path (Table 4.2) and the workspace bucket's
+> own `Deny` on DBFS access to that prefix (Table 3.2). There is no
+> separate metastore bucket to create.
 
 ### Step 9.2 — Assign the metastore to the workspace
 
@@ -817,12 +819,12 @@ If any of those fail, walk back to the section listed in **Appendix C**.
 | IAM | Storage trust role (self-assuming) | `dbks-dev-trust-role-ws` |
 | S3 | TF state | `dbks-infra-s3-tf-state` |
 | S3 | Workspace artifacts | `dbks-infra-dev-s3-ws` |
-| S3 | UC metastore (dev) | `dbks-infra-dev-s3-metastore` |
+| S3 | UC managed data (dev) | `dbks-infra-dev-s3-ws/unity-catalog/*` (no separate metastore bucket — metastore has no `storage_root`) |
 | Databricks | Credential config | `dev-ws-cloud-credential` |
 | Databricks | Network config | `dbks-infra-dev-network-config` |
 | Databricks | Storage config | `dev-ws-storage` |
 | Databricks | Workspace | `dbks-infra-dev-ws` (`dbc-03363fa1-0d7a`) |
-| Databricks | Metastore | `dbks-infra-meta-us-east-2` |
+| Databricks | Metastore | `dbks-infra-meta-us2` |
 | Databricks | Catalog (dev) | `dbks-infra-dev-cat` |
 
 ---
