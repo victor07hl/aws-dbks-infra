@@ -37,3 +37,13 @@ module "secrets_databricks_auth" {
   secret_name = var.databricks_secret_name
   kms_alias   = var.databricks_secret_kms_alias
 }
+
+module "databricks_metastore" {
+  source = "../../modules/databricks-metastore"
+  providers = {
+    databricks.account = databricks.account
+  }
+
+  metastore_name = var.metastore_name
+  region         = var.region
+}

@@ -11,6 +11,7 @@ aws-dbks-infra/
 │   ├── iam-credential/         # Cross-account IAM role for Databricks control plane
 │   ├── s3-workspace/           # Per-env workspace bucket (artifacts + UC managed data)
 │   ├── iam-storage/            # Self-assuming UC trust role (UCMasterRole + self)
+│   ├── databricks-metastore/   # Unity Catalog metastore, no storage_root (account-level, shared)
 │   ├── databricks-workspace/   # Credential / network / storage configs + mws_workspace
 │   ├── databricks-catalog/     # Unity Catalog catalog, schemas, workspace binding
 │   └── databricks-cluster/     # Reusable cluster compute (all-purpose / job)
@@ -77,6 +78,16 @@ Self-assuming UC trust role (`dbks-{env}-trust-role-ws`). Trust policy lists bot
 | `variables.tf` | `databricks_account_id`, `role_name`, `bucket_arn`, `kms_key_arn` |
 | `outputs.tf` | `role_arn` |
 
+#### `modules/databricks-metastore/`
+
+Single shared Unity Catalog metastore (`dbks-infra-meta-us2`, account-level, one per region). **No `storage_root`** (project decision) — UC managed data lands in each workspace's own bucket under `/unity-catalog/*` instead. Uses the account-level `provider "databricks"` (alias `account`); the aliased provider must be passed explicitly via the module's `providers = { databricks.account = databricks.account }` block. Adopted into state via a one-time `import` block (since removed — see `git log -- environments/dev/imports.tf`) rather than created fresh, since it was originally provisioned manually per `docs/manual-deployment-findings.md` Part 9.
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `databricks_metastore` (no `storage_root`) |
+| `variables.tf` | `metastore_name`, `region`, `delta_sharing_scope`, `delta_sharing_recipient_token_lifetime_in_seconds`, `force_destroy` |
+| `outputs.tf` | `metastore_id` |
+
 #### `modules/databricks-workspace/`
 
 Account-level Databricks configurations (credential, network, storage) and the workspace itself.
@@ -117,7 +128,7 @@ Environment-specific root modules. Each folder is an independent Terraform root 
 
 | File | Extension | Purpose |
 |------|-----------|---------|
-| `main.tf` | `.tf` | Calls the seven `modules/*` modules (network → iam-credential + s3-workspace → iam-storage → databricks-workspace → databricks-catalog, plus databricks-cluster as needed) with env-specific inputs |
+| `main.tf` | `.tf` | Calls the `modules/*` modules (network → iam-credential + s3-workspace → iam-storage → secrets-databricks-auth → databricks-metastore → databricks-workspace → databricks-catalog, plus databricks-cluster as needed) with env-specific inputs. Currently wired in `environments/dev/main.tf`: network, iam-credential, s3-workspace, iam-storage, secrets-databricks-auth, databricks-metastore — the remaining databricks-workspace/databricks-catalog/databricks-cluster modules exist but aren't invoked yet |
 | `variables.tf` | `.tf` | Declares all variables used in this environment |
 | `outputs.tf` | `.tf` | Exposes key values (workspace URL, catalog name) after apply |
 | `providers.tf` | `.tf` | Configures the `aws` and `databricks` providers with region, `default_tags`, and auth settings |
