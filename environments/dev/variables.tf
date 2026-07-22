@@ -69,3 +69,9 @@ variable "databricks_secret_kms_alias" {
   type        = string
   default     = "alias/dbks-infra-dev-kms-sm"
 }
+
+variable "metastore_name" {
+  description = "Name of the shared Unity Catalog metastore (account-level, no storage_root)"
+  type        = string
+  default     = "dbks-infra-meta-us2"
+}
