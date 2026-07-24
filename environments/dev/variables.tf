@@ -75,3 +75,48 @@ variable "metastore_name" {
   type        = string
   default     = "dbks-infra-meta-us2"
 }
+
+variable "workspace_credential_name" {
+  description = "Name of the Databricks credential configuration"
+  type        = string
+  default     = "dev-ws-cloud-credential"
+}
+
+variable "workspace_network_config_name" {
+  description = "Name of the Databricks network configuration"
+  type        = string
+  default     = "dbks-infra-dev-network-config"
+}
+
+variable "workspace_storage_config_name" {
+  description = "Name of the Databricks storage configuration"
+  type        = string
+  default     = "dev-ws-storage"
+}
+
+variable "workspace_name" {
+  description = "Name of the Databricks workspace (live value is \"DEV\", not \"dbks-infra-dev-ws\" as docs/manual-deployment-findings.md Appendix A claims — confirmed via account API during IT-62, same drift class as the IT-61 metastore-name lesson)"
+  type        = string
+  default     = "DEV"
+}
+
+variable "workspace_pricing_tier" {
+  description = "Databricks pricing tier (PREMIUM required for Unity Catalog)"
+  type        = string
+  default     = "PREMIUM"
+}
+
+variable "workspace_network_security_group_ids" {
+  description = <<-EOT
+    Security group ID(s) the live Databricks network configuration actually
+    references. Deliberately NOT module.network.security_group_id: the live
+    network config was built against the VPC's default SG (drift from the
+    intended dedicated workspace SG, confirmed live during IT-62). Changing
+    this value forces destroy+recreate of the network config attached to a
+    running workspace, which databricks_mws_networks doesn't support as an
+    in-place update — do not "fix" this here; migrate deliberately via a
+    follow-up ticket instead.
+  EOT
+  type        = list(string)
+  default     = ["sg-042bea1eb2be1eaa8"]
+}

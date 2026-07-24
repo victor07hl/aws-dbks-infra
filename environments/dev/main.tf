@@ -47,3 +47,32 @@ module "databricks_metastore" {
   metastore_name = var.metastore_name
   region         = var.region
 }
+
+module "databricks_workspace" {
+  source = "../../modules/databricks-workspace"
+  providers = {
+    databricks.account = databricks.account
+  }
+
+  databricks_account_id = var.databricks_account_id
+
+  credential_name     = var.workspace_credential_name
+  credential_role_arn = module.iam_credential.role_arn
+
+  network_config_name = var.workspace_network_config_name
+  vpc_id              = module.network.vpc_id
+  subnet_ids          = module.network.private_subnet_ids
+  security_group_ids  = var.workspace_network_security_group_ids
+
+  storage_config_name = var.workspace_storage_config_name
+  bucket_name         = module.s3_workspace.bucket_name
+  storage_role_arn    = module.iam_storage.role_arn
+
+  workspace_name = var.workspace_name
+  region         = var.region
+  pricing_tier   = var.workspace_pricing_tier
+
+  metastore_id = module.databricks_metastore.metastore_id
+
+  m2m_service_principal_application_id = local.databricks_m2m_creds.client_id
+}
