@@ -2,7 +2,7 @@
 
 This guide walks you through manually mounting a Databricks Unity Catalog
 workspace on AWS, end to end. It is written so a new data engineer can follow
-it click-by-click and end up with a working `dbks-infra-dev-ws` workspace.
+it click-by-click and end up with a working `DEV` workspace.
 
 The order matters: every Databricks console step depends on AWS resources
 created in earlier sections. **Do not skip ahead.**
@@ -52,10 +52,22 @@ running and a new data engineer can log in.
 | 5 | Databricks account console | Credential configuration | `dev-ws-cloud-credential` |
 | 6 | Databricks account console | Network configuration | `dbks-infra-dev-network-config` |
 | 7 | Databricks account console | Storage configuration | `dev-ws-storage` |
-| 8 | Databricks account console | Workspace | `dbks-infra-dev-ws` |
+| 8 | Databricks account console | Workspace | `DEV`* |
 | 9 | Databricks account console | Unity Catalog metastore + assignment | `dbks-infra-meta-us2` |
-| 10 | Workspace SQL editor | Catalog + schemas + workspace binding | `dbks-infra-dev-cat` |
+| 10 | Workspace SQL editor | Catalog + schemas + workspace binding | `dbks-infra-dev-cat`† |
 | 11 | Databricks account console | Service principals + groups | `dbks-infra-dev-sp-*`, `dbks-infra-dev-grp-*` |
+
+\* The workspace naming field only accepts a display name — `DEV` is what
+was actually typed, which also matches the `DEV`/`PROD` pattern in
+`docs/naming-conventions.docx` (this project name column elsewhere follows
+the AWS-resource pattern, but the live workspace itself is named per that
+separate Databricks convention). See Appendix A.
+
+† This is the prescriptive step. The live `DEV` workspace never actually had
+this step run — its catalog is Unity Catalog's auto-generated default
+(`dev_<workspace_id>`), and the `raw/bronze/silver/gold/stage` schemas below
+were never created. See Appendix A and Jira IT-66 for the follow-up to
+create a real project-named catalog.
 
 ---
 
@@ -193,8 +205,13 @@ Make sure all three subnets are associated (Subnet associations tab).
 
 ### Step 1.7 — Create the workspace security group
 
-**EC2** → **Security groups** → **Create security group**, attached to
-`dbks-infra-dev-vpc`.
+**EC2** → **Security groups** → **Create security group**, named
+`dbks-infra-dev-sg-workspace` (per `docs/naming-conventions.docx`), attached
+to `dbks-infra-dev-vpc`.
+
+> **This name field was missing from earlier revisions of this guide,**
+> which is how the live `DEV` workspace ended up wired to the VPC's
+> unnamed default security group instead — see Appendix A and Jira IT-65.
 
 **Inbound rules** — both rules use the same SG as their source (self-reference):
 
@@ -660,12 +677,16 @@ configurations selected. Fill in the rest.
 
 | Field | Value |
 |---|---|
-| Workspace name | `dbks-infra-dev-ws` |
+| Workspace name | `DEV` |
 | Region | `us-east-2` |
 | Pricing tier | Premium (required for Unity Catalog) |
 | Compute credentials | `dev-ws-cloud-credential` |
 | Network configuration | `dbks-infra-dev-network-config` |
 | Workspace storage | `dev-ws-storage` |
+
+> The Databricks workspace name field follows the `DEV`/`PROD` convention in
+> `docs/naming-conventions.docx`, not the `dbks-infra-{env}-*` pattern used
+> for AWS resources and other Databricks object types.
 
 Click **Save** and watch the status. It moves **Provisioning → Running**
 (usually under 10 minutes). If it ends up **Failed**, click into the workspace
@@ -711,7 +732,7 @@ In the Databricks account console: **Catalog** → **Create metastore**. Fill in
 ### Step 9.2 — Assign the metastore to the workspace
 
 Same screen → select the new metastore → **Assign to workspaces** →
-`dbks-infra-dev-ws`.
+`DEV`.
 
 ---
 
@@ -719,6 +740,13 @@ Same screen → select the new metastore → **Assign to workspaces** →
 
 Open the workspace itself (the URL from Step 8.2) and switch to the **SQL
 editor**.
+
+> **This step was never actually run for the live `DEV` workspace.** Its
+> catalog is Unity Catalog's auto-generated default (`dev_<workspace_id>`,
+> confirmed via the account API during the Terraform import — see Jira
+> IT-63), with no medallion schemas created. This section remains the
+> prescriptive procedure for creating a real project-named catalog per
+> `docs/naming-conventions.docx`; see Jira IT-66 for that follow-up.
 
 ### Step 10.1 — Create the catalog
 
@@ -730,7 +758,7 @@ CREATE CATALOG IF NOT EXISTS `dbks-infra-dev-cat`;
 
 In the workspace UI: **Catalog** → select `dbks-infra-dev-cat` → **Workspaces**
 tab → **Manage** → switch from "All workspaces" to **Specific workspaces** →
-add `dbks-infra-dev-ws`.
+add `DEV`.
 
 ### Step 10.3 — Create the schemas
 
@@ -758,7 +786,7 @@ In the **account console** → **User management** → **Service principals** /
 ### Step 11.1 — Service principals
 
 Create the two service principals from **Table 11.1**, then add each to the
-workspace (**Workspaces → dbks-infra-dev-ws → Permissions → Add**).
+workspace (**Workspaces → DEV → Permissions → Add**).
 
 **Table 11.1 — Service principals**
 
@@ -794,8 +822,8 @@ Before declaring the workspace done, run through these checks.
 | You can log into the workspace | Open the URL from Step 8.2 |
 | Cluster starts and stays running | Compute → Create cluster (smallest single-node config); wait for green |
 | `SELECT 1` works on the cluster | SQL editor against the cluster |
-| Catalog is bound | Catalog → `dbks-infra-dev-cat` → Workspaces tab shows `dbks-infra-dev-ws` only |
-| Write a managed table to UC | `CREATE TABLE dbks-infra-dev-cat.stage.smoke_test (id INT) USING DELTA;` then `DROP TABLE` |
+| Catalog is bound | Catalog → live catalog name (see Appendix A) → Workspaces tab shows `DEV` only |
+| Write a managed table to UC | `CREATE TABLE <catalog>.default.smoke_test (id INT) USING DELTA;` then `DROP TABLE` (substitute the live catalog/schema from Appendix A — `dbks-infra-dev-cat` and the `stage` schema in this row's original form don't exist; see IT-66) |
 | No DBFS path can hit `unity-catalog/*` | `dbutils.fs.ls("s3://dbks-infra-dev-s3-ws/unity-catalog/")` should error (Deny in Table 3.2) |
 
 If any of those fail, walk back to the section listed in **Appendix C**.
@@ -823,9 +851,24 @@ If any of those fail, walk back to the section listed in **Appendix C**.
 | Databricks | Credential config | `dev-ws-cloud-credential` |
 | Databricks | Network config | `dbks-infra-dev-network-config` |
 | Databricks | Storage config | `dev-ws-storage` |
-| Databricks | Workspace | `dbks-infra-dev-ws` (`dbc-03363fa1-0d7a`) |
+| Databricks | Workspace | `DEV` (`dbc-03363fa1-0d7a`) |
 | Databricks | Metastore | `dbks-infra-meta-us2` |
-| Databricks | Catalog (dev) | `dbks-infra-dev-cat` |
+| Databricks | Catalog (dev) | `dev_7474644050018837` |
+
+> **Naming drift confirmed live during the Terraform import (IT-62/IT-63),
+> not this manual guide's original prescription:**
+> - **Workspace** — the guide's Part 5/8 steps above now say `DEV` (fixed);
+>   this actually matches `docs/naming-conventions.docx`'s `DEV`/`PROD`
+>   workspace pattern, so no further action needed there.
+> - **Network config security group** — the live network config
+>   (`dbks-infra-dev-network-config`) references the VPC's *default*
+>   security group, not the dedicated `dbks-infra-dev-sg-workspace` this
+>   guide's Part 1/6 steps call for. Tracked in Jira IT-65.
+> - **Catalog** — no `dbks-infra-dev-cat` was ever created; the live
+>   catalog is Unity Catalog's auto-generated default
+>   (`dev_<workspace_id>`), and only the `default`/`information_schema`
+>   schemas exist (not the `raw/bronze/silver/gold/stage` medallion set
+>   this guide's Part 10 describes). Tracked in Jira IT-66.
 
 ---
 
