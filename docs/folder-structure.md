@@ -90,23 +90,25 @@ Single shared Unity Catalog metastore (`dbks-infra-meta-us2`, account-level, one
 
 #### `modules/databricks-workspace/`
 
-Account-level Databricks configurations (credential, network, storage) and the workspace itself.
+Account-level Databricks configurations (credential, network, storage), the workspace itself, its metastore assignment, and an ADMIN permission assignment granting the OAuth M2M service principal workspace-level access. Uses the account-level `provider "databricks"` (alias `account`), passed explicitly via `providers = { databricks.account = databricks.account }`. Adopted into state via one-time `import` blocks (since removed — see `git log -- environments/dev/imports.tf`) for the four pre-existing pieces (credential/network/storage config, workspace); the metastore assignment and permission assignment were created fresh, since Databricks' metastore-assignment API is an idempotent PUT.
 
 | File | Purpose |
 |------|---------|
-| `main.tf` | `databricks_mws_credentials`, `databricks_mws_networks`, `databricks_mws_storage_configurations`, `databricks_mws_workspaces` |
-| `variables.tf` | `workspace_name`, `region`, credential/network/storage IDs, `databricks_account_id` |
-| `outputs.tf` | `workspace_id`, `workspace_url` |
+| `main.tf` | `databricks_mws_credentials`, `databricks_mws_networks`, `databricks_mws_storage_configurations`, `databricks_mws_workspaces`, `databricks_metastore_assignment`, `data "databricks_service_principal"`, `databricks_mws_permission_assignment` |
+| `variables.tf` | `databricks_account_id`, `credential_name`, `credential_role_arn`, `network_config_name`, `vpc_id`, `subnet_ids`, `security_group_ids`, `storage_config_name`, `bucket_name`, `storage_role_arn`, `workspace_name`, `region`, `pricing_tier`, `metastore_id`, `m2m_service_principal_application_id` |
+| `outputs.tf` | `workspace_id`, `workspace_url`, `credentials_id`, `network_id`, `storage_configuration_id` |
 
 #### `modules/databricks-catalog/`
 
-Unity Catalog catalog, schemas, and workspace binding.
+Unity Catalog catalog, a schema, and a workspace binding. Uses the workspace-level `provider "databricks"` (alias `workspace`, `host = var.workspace_host`) — `databricks_catalog`/`databricks_schema`/`databricks_workspace_binding` can only be used with a workspace-level provider. Adopted into state via one-time `import` blocks (since removed — see `git log -- environments/dev/imports.tf`), since the live catalog predates this module.
 
 | File | Purpose |
 |------|---------|
-| `main.tf` | `databricks_catalog`, schemas (`raw`, `bronze`, `silver`, `gold`, `stage`), `databricks_workspace_binding` |
-| `variables.tf` | `catalog_name`, `metastore_id`, `workspace_id` |
-| `outputs.tf` | `catalog_name`, `catalog_id` |
+| `main.tf` | `databricks_catalog`, `databricks_schema` (one schema, not the medallion set — see below), `databricks_workspace_binding` |
+| `variables.tf` | `catalog_name`, `storage_root`, `owner`, `isolation_mode`, `enable_predictive_optimization`, `schema_name`, `schema_owner`, `schema_comment`, `schema_enable_predictive_optimization`, `workspace_id`, `binding_type` (no `metastore_id` — that's a computed attribute on `databricks_catalog`, not a settable argument) |
+| `outputs.tf` | `catalog_name`, `catalog_id`, `schema_full_name` |
+
+The live dev catalog is Unity Catalog's auto-generated default (`dev_<workspace_id>`) with only its `default` schema managed — nobody ever ran the manual `CREATE CATALOG`/`CREATE SCHEMA` steps in `docs/manual-deployment-findings.md` Part 10, so the project-named catalog and `raw/bronze/silver/gold/stage` schemas described there don't exist yet. Tracked in Jira IT-66.
 
 #### `modules/databricks-cluster/`
 
@@ -128,10 +130,10 @@ Environment-specific root modules. Each folder is an independent Terraform root 
 
 | File | Extension | Purpose |
 |------|-----------|---------|
-| `main.tf` | `.tf` | Calls the `modules/*` modules (network → iam-credential + s3-workspace → iam-storage → secrets-databricks-auth → databricks-metastore → databricks-workspace → databricks-catalog, plus databricks-cluster as needed) with env-specific inputs. Currently wired in `environments/dev/main.tf`: network, iam-credential, s3-workspace, iam-storage, secrets-databricks-auth, databricks-metastore — the remaining databricks-workspace/databricks-catalog/databricks-cluster modules exist but aren't invoked yet |
+| `main.tf` | `.tf` | Calls the `modules/*` modules (network → iam-credential + s3-workspace → iam-storage → secrets-databricks-auth → databricks-metastore → databricks-workspace → databricks-catalog, plus databricks-cluster as needed) with env-specific inputs. Currently wired in `environments/dev/main.tf`: network, iam-credential, s3-workspace, iam-storage, secrets-databricks-auth, databricks-metastore, databricks-workspace, databricks-catalog — only databricks-cluster remains unwired |
 | `variables.tf` | `.tf` | Declares all variables used in this environment |
-| `outputs.tf` | `.tf` | Exposes key values (workspace URL, catalog name) after apply |
-| `providers.tf` | `.tf` | Configures the `aws` and `databricks` providers with region, `default_tags`, and auth settings |
+| `outputs.tf` | `.tf` | *(not yet created)* Intended to expose key values (workspace URL, catalog name) after apply |
+| `providers.tf` | `.tf` | Configures the `aws` provider and two aliased `databricks` providers: `account` (`accounts.cloud.databricks.com`, for metastore/workspace-level account resources) and `workspace` (`var.workspace_host`, for catalog/schema/binding resources) — both authenticate with the same OAuth M2M service-principal credentials from Secrets Manager |
 | `versions.tf` | `.tf` | `required_version >= 1.10` and pinned `required_providers` (aws ~> 5.0, databricks ~> 1.39) |
 | `backend.tf` | `.tf` | Remote state in S3 (`dbks-infra-s3-tf-state`) with native S3 locking via `use_lockfile = true` — no DynamoDB |
 | `terraform.tfvars` | `.tfvars` | *(gitignored)* Actual sensitive values: tokens, account IDs, bucket names |
@@ -165,7 +167,7 @@ Project documentation in Markdown format.
 | File | Extension | Purpose |
 |------|-----------|---------|
 | `folder-structure.md` | `.md` | This file — directory layout and file conventions |
-| `naming-conventions.md` | `.md` | Naming rules for Terraform resources, modules, variables, and AWS/Databricks objects |
+| `naming-conventions.docx` | `.docx` | Naming rules for Terraform resources, modules, variables, and AWS/Databricks objects |
 
 ---
 
@@ -189,4 +191,4 @@ Project documentation in Markdown format.
 - All changes flow through: `feature branch → dev → main`.
 - State files (`*.tfstate`) are gitignored; remote state is managed via S3 with native locking (`use_lockfile = true`, Terraform ≥ 1.10) — no DynamoDB.
 - Every root-module variable in `environments/{dev,prod}` needs a `default`, since no CI workflow passes `-var-file`/`-var` (see `plan-dev.yml`/`apply-dev.yml`/etc.) — `terraform.tfvars` is local-only and gitignored.
-- See [naming-conventions.md](naming-conventions.md) for resource naming rules.
+- See [naming-conventions.docx](naming-conventions.docx) for resource naming rules.
