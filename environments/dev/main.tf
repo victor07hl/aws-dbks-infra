@@ -76,3 +76,20 @@ module "databricks_workspace" {
 
   m2m_service_principal_application_id = local.databricks_m2m_creds.client_id
 }
+
+module "databricks_catalog" {
+  source = "../../modules/databricks-catalog"
+  providers = {
+    databricks.workspace = databricks.workspace
+  }
+
+  catalog_name   = var.catalog_name
+  storage_root   = var.catalog_storage_root
+  owner          = var.catalog_owner
+  isolation_mode = var.catalog_isolation_mode
+
+  schema_name  = var.catalog_schema_name
+  schema_owner = var.catalog_schema_owner
+
+  workspace_id = module.databricks_workspace.workspace_id
+}
