@@ -120,3 +120,52 @@ variable "workspace_network_security_group_ids" {
   type        = list(string)
   default     = ["sg-042bea1eb2be1eaa8"]
 }
+
+variable "workspace_host" {
+  description = "URL of the live Databricks workspace, used by the workspace-level provider (IT-63)"
+  type        = string
+  default     = "https://dbc-03363fa1-0d7a.cloud.databricks.com"
+}
+
+variable "catalog_name" {
+  description = <<-EOT
+    Name of the Unity Catalog catalog. Live value is "dev_7474644050018837" —
+    Unity Catalog's auto-generated default catalog (<workspace_name>_<workspace_id>).
+    docs/folder-structure.md's "dbks-infra-dev-cat" was never actually created
+    (confirmed live during IT-63); adopting the auto-generated catalog as-is
+    rather than creating a new project-named one is a deliberate scope
+    decision for this ticket.
+  EOT
+  type        = string
+  default     = "dev_7474644050018837"
+}
+
+variable "catalog_storage_root" {
+  description = "S3 path backing the catalog's managed data"
+  type        = string
+  default     = "s3://dbks-infra-dev-s3-ws/unity-catalog/7474644050018837"
+}
+
+variable "catalog_owner" {
+  description = "Owner principal of the catalog (Databricks-assigned default admin group for this catalog)"
+  type        = string
+  default     = "_workspace_admins_dev_7474644050018837"
+}
+
+variable "catalog_isolation_mode" {
+  description = "Catalog isolation mode: OPEN or ISOLATED"
+  type        = string
+  default     = "ISOLATED"
+}
+
+variable "catalog_schema_name" {
+  description = "Name of the schema being managed within the catalog"
+  type        = string
+  default     = "default"
+}
+
+variable "catalog_schema_owner" {
+  description = "Owner principal of the schema"
+  type        = string
+  default     = "_workspace_admins_dev_7474644050018837"
+}

@@ -31,3 +31,18 @@ provider "databricks" {
   client_id     = local.databricks_m2m_creds.client_id
   client_secret = local.databricks_m2m_creds.client_secret
 }
+
+# host is a plain variable defaulted to the already-known live workspace URL,
+# not derived from databricks_mws_workspaces.this.workspace_url — a provider
+# block can't depend on a not-yet-known resource attribute, and it's moot
+# anyway since we're importing an already-running workspace (IT-63). Same
+# service-principal credentials as the account-level provider; it has
+# workspace ADMIN via module.databricks_workspace's permission assignment.
+provider "databricks" {
+  alias = "workspace"
+
+  host = var.workspace_host
+
+  client_id     = local.databricks_m2m_creds.client_id
+  client_secret = local.databricks_m2m_creds.client_secret
+}
