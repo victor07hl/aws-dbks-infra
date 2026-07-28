@@ -36,8 +36,8 @@ terraform fmt -check -recursive
 ## Architecture
 
 - One metastore in us-east-2 (`dbks-infra-meta-us2`) — **no `storage_root`** configured
-- Two workspaces: dev and prod
-- Two catalogs: dev (bound to workspace-dev), prod (bound to workspace-prod)
+- Two workspaces: dev and prod — Databricks workspace *names* follow the `DEV`/`PROD` convention in `docs/naming-conventions.docx` (not the `dbks-infra-{env}-*` pattern used for AWS/other Databricks object types); live dev workspace is `DEV`
+- Two catalogs: dev (bound to workspace-dev), prod (bound to workspace-prod) — **dev's catalog is currently Unity Catalog's auto-generated default** (`dev_<workspace_id>`), not a project-named catalog, and only has its `default` schema (no `raw/bronze/silver/gold/stage` medallion set yet). See "Known drift" below (IT-66)
 - Two branches: dev (deploys to DEV), main (deploys to PROD)
 
 ### Storage topology
@@ -48,6 +48,8 @@ terraform fmt -check -recursive
 ### Auth
 - Databricks OAuth M2M service-principal credentials live in `dbks-infra-{env}-sm-databricks-m2m` (Secrets Manager, per-env CMK, `modules/secrets-databricks-auth`) — Terraform creates the container with a placeholder version (`lifecycle { ignore_changes = [secret_string] }`), the real value is populated out-of-band after manually creating the service principal (`docs/terraform-setup-aws.md` Part 9)
 - Account-level `provider "databricks"` (`alias = "account"`, host `https://accounts.cloud.databricks.com`) reads those credentials via `data "aws_secretsmanager_secret_version"` — never hardcoded
+- Workspace-level `provider "databricks"` (`alias = "workspace"`, `host = var.workspace_host` — a plain variable defaulted to the known live URL, not derived from a computed workspace attribute) uses the same credentials; required because `databricks_catalog`/`databricks_schema`/`databricks_workspace_binding` only work with a workspace-level provider
+- The same service principal is granted workspace `ADMIN` via `databricks_mws_permission_assignment` in `modules/databricks-workspace`, so it can authenticate at the workspace level (not just the account level) to manage catalog/schema objects
 
 ## Stack
 - Terraform for all infrastructure
@@ -80,3 +82,11 @@ Terraform state files (`*.tfstate`) are also gitignored; remote state uses S3 wi
 - Secrets: AWS Secrets Manager with CMK + automatic rotation
 - IAM: OIDC federation for GitHub Actions, cross-account roles with `sts:ExternalId` condition for Databricks. The UC storage trust role (`dbks-{env}-trust-role-ws`) must be **self-assuming** — its trust policy lists both `UCMasterRole` and the role's own ARN
 - Audit: multi-region CloudTrail with log file validation, shipped to S3 + CloudWatch Logs
+
+## Known drift / open follow-ups
+- **IT-65** — dev's live Databricks network config (`dbks-infra-dev-network-config`) references the VPC's default security group, not the dedicated `dbks-infra-dev-sg-workspace`. Imported as-is (see `environments/dev/variables.tf`'s `workspace_network_security_group_ids`) rather than forcing a destroy/recreate of the live config; migrate deliberately. Note: the dedicated SG itself currently has wide-open egress and zero ingress rules — fix that before migrating to it.
+- **IT-66** — dev's live catalog is Unity Catalog's auto-generated default (`dev_<workspace_id>`), not a project-named catalog per `docs/naming-conventions.docx`; the `raw/bronze/silver/gold/stage` schemas from `docs/folder-structure.md` were never created.
+- **S3 workspace bucket** (`dbks-infra-dev-s3-ws`) has versioning disabled and SSE-S3 (not SSE-KMS) in the already-applied live bucket — contradicts the security baseline above; preserved as-is in Terraform (state-move only, not a config fix) pending a deliberate remediation.
+- **No NACL** is currently defined in `modules/network` (relies on the AWS default allow-all NACL) despite being described in `docs/architecture/network-topology.md`.
+- **NAT Gateway is the dominant AWS cost driver** for dev (~$30/month, running 24/7) — `docs/manual-deployment-findings.md` Appendix C recommends VPC endpoints (S3/DynamoDB gateway; STS/Kinesis/Secrets Manager/KMS interface) to cut this and keep secret retrieval off the public path; not yet implemented.
+- A leftover manual test EC2 instance (`dbks-infra-dev-vm-test`, from the connectivity check in `docs/manual-deployment-findings.md` Part 1) was never terminated — currently **stopped** (negligible cost), unmanaged by Terraform, candidate for cleanup.
