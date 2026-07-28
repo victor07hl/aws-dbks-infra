@@ -7,21 +7,22 @@ Terraform infrastructure for Databricks Unity Catalog on AWS. Provisions two iso
 - **Region:** `us-east-2`
 - **Metastore:** one shared account-level metastore (`dbks-infra-meta-us2`) with no `storage_root`
 - **Environments:** dev and prod — each is an independent Terraform root with its own remote state
-- **Workspaces:** one per environment, each bound to its own UC catalog
-- **Catalogs:** dev and prod, each with `raw / bronze / silver / gold / stage` schemas
+- **Workspaces:** one per environment, each bound to its own UC catalog. Databricks workspace *names* follow the `DEV`/`PROD` convention (live dev workspace is `DEV`, not `dbks-infra-dev-ws`)
+- **Catalogs:** dev and prod, intended to have `raw / bronze / silver / gold / stage` schemas — **dev currently runs on Unity Catalog's auto-generated default catalog** (`dev_<workspace_id>`) with only its `default` schema, since the project-named catalog was never actually created (tracked in Jira IT-66)
 
 ### Module breakdown
 
 | Module | Purpose |
 |---|---|
-| `modules/network` | Customer-managed VPC, subnets, IGW, NAT, NACLs, security group |
+| `modules/network` | Customer-managed VPC, subnets, IGW, NAT, security group (no NACL defined yet — see Known drift in `CLAUDE.md`) |
 | `modules/iam-credential` | Cross-account IAM role for the Databricks control plane |
 | `modules/s3-workspace` | Per-env workspace bucket (artifacts + UC managed data under `/unity-catalog/*`) |
 | `modules/iam-storage` | Self-assuming UC trust role (`UCMasterRole` + self in trust policy) |
 | `modules/secrets-databricks-auth` | Per-env CMK + Secrets Manager container for Databricks OAuth M2M service-principal credentials, read by the account-level `provider "databricks"` block |
-| `modules/databricks-workspace` | Databricks credential / network / storage configs + `mws_workspace` |
-| `modules/databricks-catalog` | Unity Catalog catalog, schemas, workspace binding |
-| `modules/databricks-cluster` | Reusable cluster compute (all-purpose / job) |
+| `modules/databricks-metastore` | Unity Catalog metastore (no `storage_root`) |
+| `modules/databricks-workspace` | Databricks credential / network / storage configs, `mws_workspace`, metastore assignment, and an ADMIN permission assignment for the OAuth M2M service principal |
+| `modules/databricks-catalog` | Unity Catalog catalog, a schema, and a workspace binding (uses the workspace-level `provider "databricks"`) |
+| `modules/databricks-cluster` | Reusable cluster compute (all-purpose / job) — **not yet implemented or wired in** |
 
 ### Remote state
 
