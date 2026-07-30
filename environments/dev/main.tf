@@ -106,3 +106,20 @@ module "databricks_cluster" {
   autotermination_minutes = var.cluster_autotermination_minutes
   runtime_engine          = var.cluster_runtime_engine
 }
+
+# Identical config to module.databricks_cluster (the "TEST" cluster) —
+# reuses the same node_type_id/spark_version/autotermination_minutes/
+# runtime_engine variables so "identical" stays a single source of truth
+# rather than two copies that can drift apart (IT-88).
+module "databricks_cluster_dev_admin" {
+  source = "../../modules/databricks-cluster"
+  providers = {
+    databricks.workspace = databricks.workspace
+  }
+
+  cluster_name            = var.cluster_dev_admin_name
+  node_type_id            = var.cluster_node_type_id
+  spark_version           = var.cluster_spark_version
+  autotermination_minutes = var.cluster_autotermination_minutes
+  runtime_engine          = var.cluster_runtime_engine
+}
