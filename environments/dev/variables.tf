@@ -199,3 +199,9 @@ variable "cluster_runtime_engine" {
   type        = string
   default     = "STANDARD"
 }
+
+variable "cluster_dev_admin_name" {
+  description = "Name of the dev_admin single-node cluster (IT-88) - identical config to the TEST cluster (var.cluster_name), created fresh rather than imported"
+  type        = string
+  default     = "dev_admin"
+}
