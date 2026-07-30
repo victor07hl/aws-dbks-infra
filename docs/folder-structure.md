@@ -112,15 +112,20 @@ The live dev catalog is Unity Catalog's auto-generated default (`dev_<workspace_
 
 #### `modules/databricks-cluster/`
 
-Single-node Databricks cluster. Uses the workspace-level `provider "databricks"` (alias `workspace`), same as `modules/databricks-catalog` — `databricks_cluster` can be used with either provider, but this project keeps all workspace-scoped resources on the same aliased provider. Adopted into state via a one-time `import` block (since removed — see `git log -- environments/dev/imports.tf`), since the live cluster (`TEST`) predates this module: it was created manually via Compute -> Create cluster as the smoke-test cluster in `docs/manual-deployment-findings.md`.
+Databricks cluster, single-node or multi-worker depending on `var.is_single_node` (default `true`). Uses the workspace-level `provider "databricks"` (alias `workspace`), same as `modules/databricks-catalog`. The single-node shape was adopted into state via a one-time `import` block (since removed — see `git log -- environments/dev/imports.tf`), since the live `TEST` cluster predates this module: it was created manually via Compute -> Create cluster as the smoke-test cluster in `docs/manual-deployment-findings.md`. `dev_admin` (IT-88) is a second, config-identical single-node instance created fresh (not imported).
 
-It's a simplified single-node cluster (`is_single_node = true`, `kind = "CLASSIC_PREVIEW"`) — Databricks auto-manages `custom_tags`, `spark_conf`, and `num_workers` rather than the module setting them explicitly. No autoscaling support (out of scope — this module is single-node only; a job-cluster/autoscale template would be a separate module if needed later).
+Two `databricks_cluster` resources, gated by `count` on `var.is_single_node`, rather than one resource with conditional arguments — `lifecycle.ignore_changes` must be a static list (Terraform constraint), so the single-node-only ignore-rule below has to live on a resource that only single-node clusters use (IT-71):
+
+- `single_node` (`count = var.is_single_node ? 1 : 0`) — simplified single-node cluster (`is_single_node = true`, `kind = "CLASSIC_PREVIEW"`). Databricks auto-manages `custom_tags`, `spark_conf`, and `num_workers` rather than the module setting them explicitly; those two fields aren't marked `Computed` in the provider schema, so they're covered by `lifecycle { ignore_changes = [custom_tags, spark_conf] }` to stop Terraform from nulling them out every plan.
+- `multi_node` (`count = var.is_single_node ? 0 : 1`) — `autoscale { min_workers, max_workers }`, caller-controlled `data_security_mode` (`SINGLE_USER` or `USER_ISOLATION` for UC).
+
+Changing a live instance's `is_single_node` value would move it between these two resources — that's a destroy+recreate, not an in-place update; don't do it without a deliberate migration plan.
 
 | File | Purpose |
 |------|---------|
-| `main.tf` | `databricks_cluster` (`is_single_node = true`, `kind = "CLASSIC_PREVIEW"`) |
-| `variables.tf` | `cluster_name`, `node_type_id`, `spark_version`, `autotermination_minutes`, `runtime_engine` |
-| `outputs.tf` | `cluster_id`, `cluster_name` |
+| `main.tf` | `databricks_cluster.single_node` (single-node), `databricks_cluster.multi_node` (autoscaling) |
+| `variables.tf` | `cluster_name`, `node_type_id`, `spark_version`, `autotermination_minutes`, `runtime_engine`, `policy_id`, `is_single_node`, `data_security_mode`, `autoscale_min`, `autoscale_max` |
+| `outputs.tf` | `cluster_id`, `cluster_name` (via `one(concat(...))` across whichever of the two resources exists) |
 
 ---
 
