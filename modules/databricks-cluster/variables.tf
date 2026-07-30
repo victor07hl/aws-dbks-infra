@@ -4,7 +4,7 @@ variable "cluster_name" {
 }
 
 variable "node_type_id" {
-  description = "AWS instance type for the single node (combined driver + executor)"
+  description = "AWS instance type for the cluster nodes (single-node: combined driver + executor; multi-worker: driver and worker node type)"
   type        = string
 }
 
@@ -23,4 +23,34 @@ variable "runtime_engine" {
   description = "Cluster runtime engine: STANDARD or PHOTON"
   type        = string
   default     = "STANDARD"
+}
+
+variable "policy_id" {
+  description = "Optional cluster policy ID to attach"
+  type        = string
+  default     = null
+}
+
+variable "is_single_node" {
+  description = "true for a simplified single-node cluster (is_single_node/kind = CLASSIC_PREVIEW); false for a multi-worker autoscaling cluster. Determines which of the two databricks_cluster resources in this module gets created (IT-71)."
+  type        = bool
+  default     = true
+}
+
+variable "data_security_mode" {
+  description = "Unity Catalog access mode for multi-worker clusters: SINGLE_USER or USER_ISOLATION. Not used when is_single_node = true (single-node clusters default to DATA_SECURITY_MODE_AUTO, platform-managed)."
+  type        = string
+  default     = "USER_ISOLATION"
+}
+
+variable "autoscale_min" {
+  description = "Minimum worker count for a multi-worker cluster's autoscale range. Not used when is_single_node = true."
+  type        = number
+  default     = 1
+}
+
+variable "autoscale_max" {
+  description = "Maximum worker count for a multi-worker cluster's autoscale range. Not used when is_single_node = true."
+  type        = number
+  default     = 2
 }
