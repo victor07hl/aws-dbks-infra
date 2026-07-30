@@ -93,3 +93,16 @@ module "databricks_catalog" {
 
   workspace_id = module.databricks_workspace.workspace_id
 }
+
+module "databricks_cluster" {
+  source = "../../modules/databricks-cluster"
+  providers = {
+    databricks.workspace = databricks.workspace
+  }
+
+  cluster_name            = var.cluster_name
+  node_type_id            = var.cluster_node_type_id
+  spark_version           = var.cluster_spark_version
+  autotermination_minutes = var.cluster_autotermination_minutes
+  runtime_engine          = var.cluster_runtime_engine
+}
