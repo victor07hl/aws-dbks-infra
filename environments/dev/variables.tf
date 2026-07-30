@@ -169,3 +169,33 @@ variable "catalog_schema_owner" {
   type        = string
   default     = "_workspace_admins_dev_7474644050018837"
 }
+
+variable "cluster_name" {
+  description = "Name of the Databricks cluster. Live value is \"TEST\" - created manually via Compute -> Create cluster as the smoke-test single-node cluster from docs/manual-deployment-findings.md, brought under Terraform via import (IT-70)"
+  type        = string
+  default     = "TEST"
+}
+
+variable "cluster_node_type_id" {
+  description = "AWS instance type for the single-node cluster (confirmed live via `databricks clusters get`)"
+  type        = string
+  default     = "m5d.large"
+}
+
+variable "cluster_spark_version" {
+  description = "Databricks Runtime version (spark_version) of the cluster (confirmed live via `databricks clusters get`)"
+  type        = string
+  default     = "17.3.x-scala2.13"
+}
+
+variable "cluster_autotermination_minutes" {
+  description = "Minutes of inactivity before the cluster auto-terminates"
+  type        = number
+  default     = 10
+}
+
+variable "cluster_runtime_engine" {
+  description = "Cluster runtime engine: STANDARD or PHOTON"
+  type        = string
+  default     = "STANDARD"
+}

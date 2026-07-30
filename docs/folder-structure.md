@@ -112,13 +112,15 @@ The live dev catalog is Unity Catalog's auto-generated default (`dev_<workspace_
 
 #### `modules/databricks-cluster/`
 
-Reusable Databricks cluster (all-purpose or job-cluster template).
+Single-node Databricks cluster. Uses the workspace-level `provider "databricks"` (alias `workspace`), same as `modules/databricks-catalog` — `databricks_cluster` can be used with either provider, but this project keeps all workspace-scoped resources on the same aliased provider. Adopted into state via a one-time `import` block (since removed — see `git log -- environments/dev/imports.tf`), since the live cluster (`TEST`) predates this module: it was created manually via Compute -> Create cluster as the smoke-test cluster in `docs/manual-deployment-findings.md`.
+
+It's a simplified single-node cluster (`is_single_node = true`, `kind = "CLASSIC_PREVIEW"`) — Databricks auto-manages `custom_tags`, `spark_conf`, and `num_workers` rather than the module setting them explicitly. No autoscaling support (out of scope — this module is single-node only; a job-cluster/autoscale template would be a separate module if needed later).
 
 | File | Purpose |
 |------|---------|
-| `main.tf` | `databricks_cluster` (or `databricks_job_cluster_template`) |
-| `variables.tf` | `cluster_name`, `node_type_id`, `runtime_version`, `autoscale_min`, `autoscale_max` |
-| `outputs.tf` | `cluster_id` |
+| `main.tf` | `databricks_cluster` (`is_single_node = true`, `kind = "CLASSIC_PREVIEW"`) |
+| `variables.tf` | `cluster_name`, `node_type_id`, `spark_version`, `autotermination_minutes`, `runtime_engine` |
+| `outputs.tf` | `cluster_id`, `cluster_name` |
 
 ---
 
@@ -130,7 +132,7 @@ Environment-specific root modules. Each folder is an independent Terraform root 
 
 | File | Extension | Purpose |
 |------|-----------|---------|
-| `main.tf` | `.tf` | Calls the `modules/*` modules (network → iam-credential + s3-workspace → iam-storage → secrets-databricks-auth → databricks-metastore → databricks-workspace → databricks-catalog, plus databricks-cluster as needed) with env-specific inputs. Currently wired in `environments/dev/main.tf`: network, iam-credential, s3-workspace, iam-storage, secrets-databricks-auth, databricks-metastore, databricks-workspace, databricks-catalog — only databricks-cluster remains unwired |
+| `main.tf` | `.tf` | Calls the `modules/*` modules (network → iam-credential + s3-workspace → iam-storage → secrets-databricks-auth → databricks-metastore → databricks-workspace → databricks-catalog → databricks-cluster) with env-specific inputs. All eight modules are wired in `environments/dev/main.tf` (IT-70 wired the last one, databricks-cluster) |
 | `variables.tf` | `.tf` | Declares all variables used in this environment |
 | `outputs.tf` | `.tf` | *(not yet created)* Intended to expose key values (workspace URL, catalog name) after apply |
 | `providers.tf` | `.tf` | Configures the `aws` provider and two aliased `databricks` providers: `account` (`accounts.cloud.databricks.com`, for metastore/workspace-level account resources) and `workspace` (`var.workspace_host`, for catalog/schema/binding resources) — both authenticate with the same OAuth M2M service-principal credentials from Secrets Manager |
