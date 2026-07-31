@@ -127,10 +127,13 @@ resource "databricks_external_location" "vicmo" {
 # dev_<workspace_id> catalog), not instead of it — that one is left as-is
 # per IT-66's scope decision (see its variable descriptions above).
 #
-# No catalog-level storage_root: the catalog is a pure logical namespace,
-# and each schema below gets its own storage_root under the external
-# location above instead (finer-grained storage governance per medallion
-# layer, and avoids needing the catalog's own path pre-registered).
+# storage_root is set to the external location's own base URL: CREATE
+# CATALOG requires the catalog to have a managed location of its own
+# (confirmed live — "Metastore storage root URL does not exist ... please
+# provide a storage location for the catalog"), schema-level storage_root
+# alone isn't sufficient. Each schema below still gets its own subpath
+# storage_root nested under the catalog's, for per-medallion-layer storage
+# governance.
 module "databricks_catalog_vicmo" {
   source = "../../modules/databricks-catalog"
   providers = {
@@ -138,6 +141,7 @@ module "databricks_catalog_vicmo" {
   }
 
   catalog_name   = var.catalog_vicmo_name
+  storage_root   = databricks_external_location.vicmo.url
   owner          = var.catalog_vicmo_owner
   isolation_mode = var.catalog_isolation_mode
 
