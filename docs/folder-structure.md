@@ -15,7 +15,8 @@ aws-dbks-infra/
 │   ├── databricks-workspace/   # Credential / network / storage configs + mws_workspace
 │   ├── databricks-catalog/     # Unity Catalog catalog, schemas, workspace binding
 │   ├── databricks-cluster/     # Reusable cluster compute (all-purpose / job)
-│   └── databricks-cluster-policy/  # Governance contract for compute (ready-for-use, not yet instantiated)
+│   ├── databricks-cluster-policy/  # Governance contract for compute (ready-for-use, not yet instantiated)
+│   └── databricks-identity/    # Users, groups, service principals, workspace assignment (ready-for-use, not yet instantiated)
 ├── environments/
 │   ├── dev/                    # Dev environment root module (branch: dev)
 │   └── prod/                   # Prod environment root module (branch: main)
@@ -139,6 +140,20 @@ Governance contract for compute (IT-72): a `databricks_cluster_policy` constrain
 | `main.tf` | `databricks_cluster_policy.this` |
 | `variables.tf` | `policy_name`, `definition`, `max_clusters_per_user` (optional) |
 | `outputs.tf` | `policy_id` |
+
+#### `modules/databricks-identity/`
+
+Identity module (IT-73) for users, groups, service principals, and workspace binding — designed so the "new engineer joins" flow is just adding one entry to `group_members`. Uses the account-level `provider "databricks"` (alias `account`) throughout, since every resource here (`databricks_user`, `databricks_group`, `databricks_service_principal`, `databricks_group_member`, `databricks_mws_permission_assignment`) is account-level; no workspace-level provider is needed.
+
+All four collection inputs (`users`, `groups`, `service_principals`, `group_members`) and `group_workspace_permissions` default empty, so the module creates nothing until populated. Membership is expressed as maps keyed by short reference keys (not by user_name/display_name directly) so `group_members` can cross-reference `users`/`service_principals` entries; `group_workspace_permissions` reuses the same `databricks_mws_permission_assignment` resource and account-level pattern already established in `modules/databricks-workspace` for the M2M service principal's ADMIN assignment.
+
+**Ready-for-use only** — authored and `fmt`/`validate`-clean, but not instantiated in any environment root yet (no live users/groups exist). See the commented example module call (a "data-engineers" group with one member) at the top of `main.tf`.
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `databricks_user.this`, `databricks_group.this`, `databricks_service_principal.this` (all `for_each`), `databricks_group_member.user`/`.service_principal` (flattened membership), `databricks_mws_permission_assignment.group` |
+| `variables.tf` | `workspace_id`, `users`, `groups`, `service_principals`, `group_members`, `group_workspace_permissions` |
+| `outputs.tf` | `user_ids`, `group_ids`, `service_principal_ids` (all maps keyed by the input reference key) |
 
 ---
 
