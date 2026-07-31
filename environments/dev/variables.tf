@@ -155,6 +155,30 @@ variable "catalog_schema_owner" {
   default     = "_workspace_admins_dev_7474644050018837"
 }
 
+variable "catalog_vicmo_name" {
+  description = "Name of the project-scoped Unity Catalog catalog, per naming-conventions.docx's {project_name} pattern (lowercase, no hyphens/underscores) (IT-66). Created alongside, not instead of, the pre-existing auto-generated catalog_name catalog — that one is left as-is per IT-66's scope decision."
+  type        = string
+  default     = "vicmo"
+}
+
+variable "catalog_vicmo_storage_root" {
+  description = "S3 path registered as the External Location covering the vicmo catalog's schemas (IT-66). Not the catalog's own storage_root — the catalog has none; each schema sets its own storage_root as a subpath under this URL instead, since Unity Catalog requires any managed storage path to be covered by a registered External Location when the metastore has no storage_root of its own."
+  type        = string
+  default     = "s3://dbks-infra-dev-s3-ws/unity-catalog/vicmo"
+}
+
+variable "catalog_vicmo_storage_credential_name" {
+  description = "Name of the Unity Catalog storage credential backing the vicmo catalog's External Location, wrapping the existing self-assuming UC trust role (module.iam_storage.role_arn)"
+  type        = string
+  default     = "vicmo-storage-credential"
+}
+
+variable "catalog_vicmo_external_location_name" {
+  description = "Name of the Unity Catalog External Location covering catalog_vicmo_storage_root"
+  type        = string
+  default     = "vicmo-external-location"
+}
+
 variable "cluster_name" {
   description = "Name of the Databricks cluster. Live value is \"TEST\" - created manually via Compute -> Create cluster as the smoke-test single-node cluster from docs/manual-deployment-findings.md, brought under Terraform via import (IT-70)"
   type        = string
