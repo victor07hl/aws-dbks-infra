@@ -106,21 +106,6 @@ variable "workspace_pricing_tier" {
   default     = "PREMIUM"
 }
 
-variable "workspace_network_security_group_ids" {
-  description = <<-EOT
-    Security group ID(s) the live Databricks network configuration actually
-    references. Deliberately NOT module.network.security_group_id: the live
-    network config was built against the VPC's default SG (drift from the
-    intended dedicated workspace SG, confirmed live during IT-62). Changing
-    this value forces destroy+recreate of the network config attached to a
-    running workspace, which databricks_mws_networks doesn't support as an
-    in-place update — do not "fix" this here; migrate deliberately via a
-    follow-up ticket instead.
-  EOT
-  type        = list(string)
-  default     = ["sg-042bea1eb2be1eaa8"]
-}
-
 variable "workspace_host" {
   description = "URL of the live Databricks workspace, used by the workspace-level provider (IT-63)"
   type        = string

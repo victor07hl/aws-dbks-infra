@@ -116,11 +116,83 @@ resource "aws_security_group" "workspace" {
   description = "launch-wizard-3 created 2026-04-28T20:04:33.678Z"
   vpc_id      = aws_vpc.this.id
 
-  egress {
-    description = ""
+  # docs/manual-deployment-findings.md Table 1.7a — self-referencing rules
+  # for internal cluster traffic (IT-65: this SG previously had zero ingress
+  # rules, which would have blocked intra-cluster communication once wired
+  # into the live network config).
+  ingress {
+    description = "Internal cluster traffic (TCP)"
     from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    to_port     = 65535
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
+    description = "Internal cluster traffic (UDP)"
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "udp"
+    self        = true
+  }
+
+  # docs/manual-deployment-findings.md Table 1.7b — self-referencing internal
+  # traffic plus the specific control-plane/metastore/SCC/lineage ports,
+  # replacing the previous all-traffic-to-0.0.0.0/0 egress rule (IT-65: that
+  # rule was far wider than Databricks classic connectivity requires).
+  egress {
+    description = "Internal cluster traffic (TCP)"
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    self        = true
+  }
+
+  egress {
+    description = "Internal cluster traffic (UDP)"
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "udp"
+    self        = true
+  }
+
+  egress {
+    description = "Control plane, S3, STS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Hive metastore"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "SCC"
+    from_port   = 8443
+    to_port     = 8443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Lineage / logging"
+    from_port   = 8444
+    to_port     = 8444
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "SCC"
+    from_port   = 8445
+    to_port     = 8445
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
