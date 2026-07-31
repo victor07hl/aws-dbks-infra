@@ -24,6 +24,16 @@ resource "databricks_mws_networks" "this" {
   vpc_id             = var.vpc_id
   subnet_ids         = var.subnet_ids
   security_group_ids = var.security_group_ids
+
+  # security_group_ids forces replacement, and Databricks refuses to delete
+  # a network config still referenced by an active workspace (IT-65). With
+  # the default destroy-then-create order that delete happens first and
+  # fails; create_before_destroy makes Terraform create the new network
+  # config, repoint databricks_mws_workspaces.this.network_id at it, and
+  # only then destroy the old one.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "databricks_mws_storage_configurations" "this" {

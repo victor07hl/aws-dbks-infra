@@ -62,7 +62,7 @@ module "databricks_workspace" {
   network_config_name = var.workspace_network_config_name
   vpc_id              = module.network.vpc_id
   subnet_ids          = module.network.private_subnet_ids
-  security_group_ids  = var.workspace_network_security_group_ids
+  security_group_ids  = [module.network.security_group_id]
 
   storage_config_name = var.workspace_storage_config_name
   bucket_name         = module.s3_workspace.bucket_name
