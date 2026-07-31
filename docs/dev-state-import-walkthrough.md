@@ -335,7 +335,7 @@ The config mirrors what is actually deployed, which diverges from the guide:
 - Workspace bucket uses **SSE-S3**, not SSE-KMS CMK
 - Bucket **versioning is OFF**
 - **Default NACL** only — no Databricks port rules
-- Security group is `launch-wizard-3` with minimal rules
+- Security group is `launch-wizard-3` with minimal rules (fixed via IT-65 — see `manual-deployment-findings.md` Appendix A)
 - VPC Name tag is `dbks-infra` (not `dbks-infra-dev-vpc`)
 
 These are deliberate future changes, separate from the import.

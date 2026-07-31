@@ -84,7 +84,6 @@ Terraform state files (`*.tfstate`) are also gitignored; remote state uses S3 wi
 - Audit: multi-region CloudTrail with log file validation, shipped to S3 + CloudWatch Logs
 
 ## Known drift / open follow-ups
-- **IT-65** — dev's live Databricks network config (`dbks-infra-dev-network-config`) references the VPC's default security group, not the dedicated `dbks-infra-dev-sg-workspace`. Imported as-is (see `environments/dev/variables.tf`'s `workspace_network_security_group_ids`) rather than forcing a destroy/recreate of the live config; migrate deliberately. Note: the dedicated SG itself currently has wide-open egress and zero ingress rules — fix that before migrating to it.
 - **IT-66** — dev's live catalog is Unity Catalog's auto-generated default (`dev_<workspace_id>`), not a project-named catalog per `docs/naming-conventions.docx`; the `raw/bronze/silver/gold/stage` schemas from `docs/folder-structure.md` were never created.
 - **S3 workspace bucket** (`dbks-infra-dev-s3-ws`) has versioning disabled and SSE-S3 (not SSE-KMS) in the already-applied live bucket — contradicts the security baseline above; preserved as-is in Terraform (state-move only, not a config fix) pending a deliberate remediation.
 - **No NACL** is currently defined in `modules/network` (relies on the AWS default allow-all NACL) despite being described in `docs/architecture/network-topology.md`.

@@ -860,10 +860,17 @@ If any of those fail, walk back to the section listed in **Appendix C**.
 > - **Workspace** — the guide's Part 5/8 steps above now say `DEV` (fixed);
 >   this actually matches `docs/naming-conventions.docx`'s `DEV`/`PROD`
 >   workspace pattern, so no further action needed there.
-> - **Network config security group** — the live network config
->   (`dbks-infra-dev-network-config`) references the VPC's *default*
->   security group, not the dedicated `dbks-infra-dev-sg-workspace` this
->   guide's Part 1/6 steps call for. Tracked in Jira IT-65.
+> - **Network config security group** — fixed via IT-65: the live network
+>   config (`dbks-infra-dev-network-config`) now references the dedicated
+>   `dbks-infra-dev-sg-workspace` (`sg-0929e3fd034aebd7f`) this guide's
+>   Part 1/6 steps call for, no longer the VPC's default security group. The
+>   dedicated SG's rules were also corrected to match Table 1.7a/1.7b (it
+>   previously had zero ingress rules and an all-traffic egress rule).
+>   Migrating `databricks_mws_networks.security_group_ids` required adding
+>   `lifecycle { create_before_destroy = true }` in
+>   `modules/databricks-workspace/main.tf` — Databricks refuses to delete a
+>   network config still referenced by an active workspace, which the
+>   default destroy-then-create replacement order hits.
 > - **Catalog** — no `dbks-infra-dev-cat` was ever created; the live
 >   catalog is Unity Catalog's auto-generated default
 >   (`dev_<workspace_id>`), and only the `default`/`information_schema`
