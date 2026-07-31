@@ -102,15 +102,17 @@ Account-level Databricks configurations (credential, network, storage), the work
 
 #### `modules/databricks-catalog/`
 
-Unity Catalog catalog, a schema, and a workspace binding. Uses the workspace-level `provider "databricks"` (alias `workspace`, `host = var.workspace_host`) — `databricks_catalog`/`databricks_schema`/`databricks_workspace_binding` can only be used with a workspace-level provider. Adopted into state via one-time `import` blocks (since removed — see `git log -- environments/dev/imports.tf`), since the live catalog predates this module.
+Unity Catalog catalog, one or more schemas, and a workspace binding. Uses the workspace-level `provider "databricks"` (alias `workspace`, `host = var.workspace_host`) — `databricks_catalog`/`databricks_schema`/`databricks_workspace_binding` can only be used with a workspace-level provider.
+
+The single `schema_name`/`schema_owner`-driven `databricks_schema.default` resource is the module's original shape, adopted into state via a one-time `import` block (since removed — see `git log -- environments/dev/imports.tf`) for the pre-existing auto-generated catalog. `additional_schemas` (IT-66) adds a `for_each`-driven `databricks_schema.additional` resource on top of it — a map keyed by schema name (e.g. the remaining medallion layers) — without touching `databricks_schema.default`'s resource address, so existing single-schema catalog instances get zero plan diff.
 
 | File | Purpose |
 |------|---------|
-| `main.tf` | `databricks_catalog`, `databricks_schema` (one schema, not the medallion set — see below), `databricks_workspace_binding` |
-| `variables.tf` | `catalog_name`, `storage_root`, `owner`, `isolation_mode`, `enable_predictive_optimization`, `schema_name`, `schema_owner`, `schema_comment`, `schema_enable_predictive_optimization`, `workspace_id`, `binding_type` (no `metastore_id` — that's a computed attribute on `databricks_catalog`, not a settable argument) |
-| `outputs.tf` | `catalog_name`, `catalog_id`, `schema_full_name` |
+| `main.tf` | `databricks_catalog`, `databricks_schema.default` (single schema), `databricks_schema.additional` (`for_each` over `additional_schemas`), `databricks_workspace_binding` |
+| `variables.tf` | `catalog_name`, `storage_root`, `owner`, `isolation_mode`, `enable_predictive_optimization`, `schema_name`, `schema_owner`, `schema_comment`, `schema_enable_predictive_optimization`, `additional_schemas`, `workspace_id`, `binding_type` (no `metastore_id` — that's a computed attribute on `databricks_catalog`, not a settable argument) |
+| `outputs.tf` | `catalog_name`, `catalog_id`, `schema_full_name`, `additional_schema_full_names` |
 
-The live dev catalog is Unity Catalog's auto-generated default (`dev_<workspace_id>`) with only its `default` schema managed — nobody ever ran the manual `CREATE CATALOG`/`CREATE SCHEMA` steps in `docs/manual-deployment-findings.md` Part 10, so the project-named catalog and `raw/bronze/silver/gold/stage` schemas described there don't exist yet. Tracked in Jira IT-66.
+`environments/dev` instantiates this module twice: `module.databricks_catalog` manages the pre-existing auto-generated catalog (`dev_<workspace_id>`, only its `default` schema) as-is, left untouched per IT-66's scope decision; `module.databricks_catalog_vicmo` (IT-66) creates the project-scoped `vicmo` catalog per `naming-conventions.docx`'s `{project_name}` pattern, with the full `raw`/`bronze`/`silver`/`gold`/`stage` medallion set from `naming-conventions.docx`'s Schemas table (`raw` via the single-schema slot, the rest via `additional_schemas`).
 
 #### `modules/databricks-cluster/`
 
