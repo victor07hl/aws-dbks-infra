@@ -14,7 +14,8 @@ aws-dbks-infra/
 │   ├── databricks-metastore/   # Unity Catalog metastore, no storage_root (account-level, shared)
 │   ├── databricks-workspace/   # Credential / network / storage configs + mws_workspace
 │   ├── databricks-catalog/     # Unity Catalog catalog, schemas, workspace binding
-│   └── databricks-cluster/     # Reusable cluster compute (all-purpose / job)
+│   ├── databricks-cluster/     # Reusable cluster compute (all-purpose / job)
+│   └── databricks-cluster-policy/  # Governance contract for compute (ready-for-use, not yet instantiated)
 ├── environments/
 │   ├── dev/                    # Dev environment root module (branch: dev)
 │   └── prod/                   # Prod environment root module (branch: main)
@@ -126,6 +127,18 @@ Changing a live instance's `is_single_node` value would move it between these tw
 | `main.tf` | `databricks_cluster.single_node` (single-node), `databricks_cluster.multi_node` (autoscaling) |
 | `variables.tf` | `cluster_name`, `node_type_id`, `spark_version`, `autotermination_minutes`, `runtime_engine`, `policy_id`, `is_single_node`, `data_security_mode`, `autoscale_min`, `autoscale_max` |
 | `outputs.tf` | `cluster_id`, `cluster_name` (via `one(concat(...))` across whichever of the two resources exists) |
+
+#### `modules/databricks-cluster-policy/`
+
+Governance contract for compute (IT-72): a `databricks_cluster_policy` constraining node types, autoscale range, autotermination, DBR version, etc. via a JSON `definition`. Uses the workspace-level `provider "databricks"` (alias `workspace`), same as `modules/databricks-cluster`. Its `policy_id` output is meant to feed `modules/databricks-cluster`'s `policy_id` input.
+
+**Ready-for-use only** — authored and `fmt`/`validate`-clean, but not instantiated in any environment root yet (no live policy exists). See the commented example module call at the top of `main.tf`.
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `databricks_cluster_policy.this` |
+| `variables.tf` | `policy_name`, `definition`, `max_clusters_per_user` (optional) |
+| `outputs.tf` | `policy_id` |
 
 ---
 
