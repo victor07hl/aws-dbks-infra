@@ -26,6 +26,19 @@ resource "databricks_schema" "default" {
   owner                          = var.schema_owner
   comment                        = var.schema_comment
   enable_predictive_optimization = var.schema_enable_predictive_optimization
+  storage_root                   = var.schema_storage_root
+}
+
+resource "databricks_schema" "additional" {
+  for_each = var.additional_schemas
+  provider = databricks.workspace
+
+  name                           = each.key
+  catalog_name                   = databricks_catalog.this.name
+  owner                          = each.value.owner
+  comment                        = each.value.comment
+  enable_predictive_optimization = each.value.enable_predictive_optimization
+  storage_root                   = each.value.storage_root
 }
 
 resource "databricks_workspace_binding" "this" {
