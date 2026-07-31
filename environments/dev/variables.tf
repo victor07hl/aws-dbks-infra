@@ -161,12 +161,6 @@ variable "catalog_vicmo_name" {
   default     = "vicmo"
 }
 
-variable "catalog_vicmo_owner" {
-  description = "Owner principal of the vicmo catalog and its schemas. Unlike the auto-generated catalog (which gets a Databricks-assigned per-catalog admin group), this is a freshly created catalog, so it defaults to the built-in account-level \"account admins\" group rather than a group that doesn't exist yet."
-  type        = string
-  default     = "account admins"
-}
-
 variable "catalog_vicmo_storage_root" {
   description = "S3 path registered as the External Location covering the vicmo catalog's schemas (IT-66). Not the catalog's own storage_root — the catalog has none; each schema sets its own storage_root as a subpath under this URL instead, since Unity Catalog requires any managed storage path to be covered by a registered External Location when the metastore has no storage_root of its own."
   type        = string

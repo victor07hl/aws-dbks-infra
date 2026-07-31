@@ -134,6 +134,13 @@ resource "databricks_external_location" "vicmo" {
 # alone isn't sufficient. Each schema below still gets its own subpath
 # storage_root nested under the catalog's, for per-medallion-layer storage
 # governance.
+#
+# owner is the M2M service principal Terraform already authenticates as
+# (same one used everywhere else in this file) rather than an admin group —
+# "account admins" (the original assumption) doesn't exist as a principal in
+# this account (confirmed live: "Could not find principal with name account
+# admins"). Migrate to a proper group once modules/databricks-identity
+# (IT-73) is wired into an environment.
 module "databricks_catalog_vicmo" {
   source = "../../modules/databricks-catalog"
   providers = {
@@ -142,18 +149,18 @@ module "databricks_catalog_vicmo" {
 
   catalog_name   = var.catalog_vicmo_name
   storage_root   = databricks_external_location.vicmo.url
-  owner          = var.catalog_vicmo_owner
+  owner          = local.databricks_m2m_creds.client_id
   isolation_mode = var.catalog_isolation_mode
 
   schema_name         = "raw"
-  schema_owner        = var.catalog_vicmo_owner
+  schema_owner        = local.databricks_m2m_creds.client_id
   schema_storage_root = "${databricks_external_location.vicmo.url}/raw"
 
   additional_schemas = {
-    bronze = { owner = var.catalog_vicmo_owner, storage_root = "${databricks_external_location.vicmo.url}/bronze" }
-    silver = { owner = var.catalog_vicmo_owner, storage_root = "${databricks_external_location.vicmo.url}/silver" }
-    gold   = { owner = var.catalog_vicmo_owner, storage_root = "${databricks_external_location.vicmo.url}/gold" }
-    stage  = { owner = var.catalog_vicmo_owner, storage_root = "${databricks_external_location.vicmo.url}/stage" }
+    bronze = { owner = local.databricks_m2m_creds.client_id, storage_root = "${databricks_external_location.vicmo.url}/bronze" }
+    silver = { owner = local.databricks_m2m_creds.client_id, storage_root = "${databricks_external_location.vicmo.url}/silver" }
+    gold   = { owner = local.databricks_m2m_creds.client_id, storage_root = "${databricks_external_location.vicmo.url}/gold" }
+    stage  = { owner = local.databricks_m2m_creds.client_id, storage_root = "${databricks_external_location.vicmo.url}/stage" }
   }
 
   workspace_id = module.databricks_workspace.workspace_id
