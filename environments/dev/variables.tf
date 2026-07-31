@@ -155,24 +155,6 @@ variable "catalog_schema_owner" {
   default     = "_workspace_admins_dev_7474644050018837"
 }
 
-variable "catalog_vicmo_name" {
-  description = "Name of the project-scoped Unity Catalog catalog, per naming-conventions.docx's {project_name} pattern (lowercase, no hyphens/underscores) (IT-66). Created alongside, not instead of, the pre-existing auto-generated catalog_name catalog — that one is left as-is per IT-66's scope decision."
-  type        = string
-  default     = "vicmo"
-}
-
-variable "catalog_vicmo_storage_root" {
-  description = "S3 path backing the vicmo catalog's managed data"
-  type        = string
-  default     = "s3://dbks-infra-dev-s3-ws/unity-catalog/vicmo"
-}
-
-variable "catalog_vicmo_owner" {
-  description = "Owner principal of the vicmo catalog and its schemas. Unlike the auto-generated catalog (which gets a Databricks-assigned per-catalog admin group), this is a freshly created catalog, so it defaults to the built-in account-level \"account admins\" group rather than a group that doesn't exist yet."
-  type        = string
-  default     = "account admins"
-}
-
 variable "cluster_name" {
   description = "Name of the Databricks cluster. Live value is \"TEST\" - created manually via Compute -> Create cluster as the smoke-test single-node cluster from docs/manual-deployment-findings.md, brought under Terraform via import (IT-70)"
   type        = string
