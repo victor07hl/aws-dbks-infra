@@ -94,6 +94,35 @@ module "databricks_catalog" {
   workspace_id = module.databricks_workspace.workspace_id
 }
 
+# Project-scoped catalog per naming-conventions.docx's {project_name}
+# pattern, with the medallion schema set from docs/folder-structure.md.
+# Created alongside module.databricks_catalog (the auto-generated
+# dev_<workspace_id> catalog), not instead of it — that one is left as-is
+# per IT-66's scope decision (see its variable descriptions above).
+module "databricks_catalog_vicmo" {
+  source = "../../modules/databricks-catalog"
+  providers = {
+    databricks.workspace = databricks.workspace
+  }
+
+  catalog_name   = var.catalog_vicmo_name
+  storage_root   = var.catalog_vicmo_storage_root
+  owner          = var.catalog_vicmo_owner
+  isolation_mode = var.catalog_isolation_mode
+
+  schema_name  = "raw"
+  schema_owner = var.catalog_vicmo_owner
+
+  additional_schemas = {
+    bronze = { owner = var.catalog_vicmo_owner }
+    silver = { owner = var.catalog_vicmo_owner }
+    gold   = { owner = var.catalog_vicmo_owner }
+    stage  = { owner = var.catalog_vicmo_owner }
+  }
+
+  workspace_id = module.databricks_workspace.workspace_id
+}
+
 module "databricks_cluster" {
   source = "../../modules/databricks-cluster"
   providers = {

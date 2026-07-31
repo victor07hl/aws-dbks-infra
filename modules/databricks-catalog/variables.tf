@@ -58,3 +58,19 @@ variable "binding_type" {
   type        = string
   default     = "BINDING_TYPE_READ_WRITE"
 }
+
+variable "additional_schemas" {
+  description = <<-EOT
+    Extra schemas to create in the catalog, keyed by schema name (e.g. the
+    remaining medallion layers bronze/silver/gold/stage), on top of the
+    single schema_name/schema_owner slot above. Empty by default, so
+    existing catalog instances that only need one schema are unaffected
+    (IT-66).
+  EOT
+  type = map(object({
+    owner                          = string
+    comment                        = optional(string, "")
+    enable_predictive_optimization = optional(string, "INHERIT")
+  }))
+  default = {}
+}
