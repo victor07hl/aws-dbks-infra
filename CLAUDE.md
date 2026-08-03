@@ -84,7 +84,7 @@ Terraform state files (`*.tfstate`) are also gitignored; remote state uses S3 wi
 - Audit: multi-region CloudTrail with log file validation, shipped to S3 + CloudWatch Logs
 
 ## Known drift / open follow-ups
-- **IT-74** — `databricks_storage_credential.vicmo`/`databricks_external_location.vicmo` in `environments/dev/main.tf` are bespoke, inline resources added by IT-66 to unblock the `vicmo` catalog's storage, not a reusable module. `modules/databricks-external-location` (IT-74, not started) should absorb them.
+- **IT-74** — `modules/databricks-external-location` now exists (ready-for-use, not yet instantiated). `databricks_storage_credential.vicmo`/`databricks_external_location.vicmo` in `environments/dev/main.tf` are still bespoke, inline resources from IT-66 — migrating them into the new module via `terraform state mv` is a future ticket, not done yet.
 - **S3 workspace bucket** (`dbks-infra-dev-s3-ws`) has versioning disabled and SSE-S3 (not SSE-KMS) in the already-applied live bucket — contradicts the security baseline above; preserved as-is in Terraform (state-move only, not a config fix) pending a deliberate remediation.
 - **No NACL** is currently defined in `modules/network` (relies on the AWS default allow-all NACL) despite being described in `docs/architecture/network-topology.md`.
 - **NAT Gateway is the dominant AWS cost driver** for dev (~$30/month, running 24/7) — `docs/manual-deployment-findings.md` Appendix C recommends VPC endpoints (S3/DynamoDB gateway; STS/Kinesis/Secrets Manager/KMS interface) to cut this and keep secret retrieval off the public path; not yet implemented.
