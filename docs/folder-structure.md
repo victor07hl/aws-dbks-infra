@@ -16,7 +16,8 @@ aws-dbks-infra/
 │   ├── databricks-catalog/     # Unity Catalog catalog, schemas, workspace binding
 │   ├── databricks-cluster/     # Reusable cluster compute (all-purpose / job)
 │   ├── databricks-cluster-policy/  # Governance contract for compute (ready-for-use, not yet instantiated)
-│   └── databricks-identity/    # Users, groups, service principals, workspace assignment (ready-for-use, not yet instantiated)
+│   ├── databricks-identity/    # Users, groups, service principals, workspace assignment (ready-for-use, not yet instantiated)
+│   └── databricks-external-location/  # External location + storage credential + grants (ready-for-use, not yet instantiated)
 ├── environments/
 │   ├── dev/                    # Dev environment root module (branch: dev)
 │   └── prod/                   # Prod environment root module (branch: main)
@@ -158,6 +159,20 @@ All four collection inputs (`users`, `groups`, `service_principals`, `group_memb
 | `main.tf` | `databricks_user.this`, `databricks_group.this`, `databricks_service_principal.this` (all `for_each`), `databricks_group_member.user`/`.service_principal` (flattened membership), `databricks_mws_permission_assignment.group` |
 | `variables.tf` | `workspace_id`, `users`, `groups`, `service_principals`, `group_members`, `group_workspace_permissions` |
 | `outputs.tf` | `user_ids`, `group_ids`, `service_principal_ids` (all maps keyed by the input reference key) |
+
+#### `modules/databricks-external-location/`
+
+External-location module (IT-74) packaging the repeatable "group needs bucket X" pattern IT-66 hand-rolled inline for the vicmo catalog: a `databricks_external_location`, an optional `databricks_storage_credential` (reuse an existing one by default via `storage_credential_name`, or create a new one with `create_storage_credential = true` + `storage_credential_role_arn`), and an optional `databricks_grants` (e.g. `CREATE_EXTERNAL_TABLE`/`CREATE_EXTERNAL_VOLUME`) to `owner_group` when set. Uses the workspace-level `provider "databricks"` (alias `workspace`), same as `modules/databricks-catalog`.
+
+AWS-side IAM is out of scope — the role backing the storage credential must already have S3 read/write + KMS decrypt on the target path from `modules/iam-storage`; this module only registers it with Unity Catalog.
+
+**Ready-for-use only** — authored and `fmt`/`validate`-clean, but not instantiated in any environment root yet. The inline `databricks_storage_credential.vicmo`/`databricks_external_location.vicmo` in `environments/dev/main.tf` (IT-66) remain as bespoke stand-ins; migrating them into this module via `terraform state mv` is a future ticket, not part of IT-74. See the commented example module calls at the top of `main.tf`.
+
+| File | Purpose |
+|------|---------|
+| `main.tf` | `databricks_storage_credential.this` (optional, `count`), `databricks_external_location.this`, `databricks_grants.this` (optional, `count`) |
+| `variables.tf` | `name`, `s3_url`, `create_storage_credential`, `storage_credential_name`, `storage_credential_role_arn`, `owner_group`, `grants` |
+| `outputs.tf` | `external_location_id`, `external_location_url` |
 
 ---
 
