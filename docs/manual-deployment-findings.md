@@ -871,11 +871,18 @@ If any of those fail, walk back to the section listed in **Appendix C**.
 >   `modules/databricks-workspace/main.tf` — Databricks refuses to delete a
 >   network config still referenced by an active workspace, which the
 >   default destroy-then-create replacement order hits.
-> - **Catalog** — no `dbks-infra-dev-cat` was ever created; the live
->   catalog is Unity Catalog's auto-generated default
->   (`dev_<workspace_id>`), and only the `default`/`information_schema`
->   schemas exist (not the `raw/bronze/silver/gold/stage` medallion set
->   this guide's Part 10 describes). Tracked in Jira IT-66.
+> - **Catalog** — fixed via IT-66: the project-scoped `vicmo` catalog now
+>   exists (per `naming-conventions.docx`'s `{project_name}` pattern, not
+>   `dbks-infra-dev-cat` as this guide's Part 10 originally described),
+>   with the full `raw`/`bronze`/`silver`/`gold`/`stage` medallion schema
+>   set, created alongside — not instead of — the pre-existing
+>   auto-generated default catalog (`dev_<workspace_id>`), which is left
+>   as-is. Each schema has its own `storage_root` nested under one
+>   `databricks_external_location`, since `CREATE CATALOG`/`CREATE SCHEMA`
+>   both require a managed storage location once the metastore itself has
+>   none (confirmed live during IT-66 — see
+>   `modules/databricks-catalog/main.tf` and its `environments/dev/main.tf`
+>   instantiation for the pattern).
 
 ---
 

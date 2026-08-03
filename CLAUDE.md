@@ -37,7 +37,7 @@ terraform fmt -check -recursive
 
 - One metastore in us-east-2 (`dbks-infra-meta-us2`) — **no `storage_root`** configured
 - Two workspaces: dev and prod — Databricks workspace *names* follow the `DEV`/`PROD` convention in `docs/naming-conventions.docx` (not the `dbks-infra-{env}-*` pattern used for AWS/other Databricks object types); live dev workspace is `DEV`
-- Two catalogs: dev (bound to workspace-dev), prod (bound to workspace-prod) — **dev's catalog is currently Unity Catalog's auto-generated default** (`dev_<workspace_id>`), not a project-named catalog, and only has its `default` schema (no `raw/bronze/silver/gold/stage` medallion set yet). See "Known drift" below (IT-66)
+- Dev has two catalogs bound to workspace-dev: the auto-generated default (`dev_<workspace_id>`, only its `default` schema, left as-is) and the project-scoped `vicmo` catalog (IT-66) with the full `raw`/`bronze`/`silver`/`gold`/`stage` medallion schema set, each schema's storage nested under one `databricks_external_location` (`s3://dbks-infra-dev-s3-ws/unity-catalog/vicmo/*`). Prod doesn't have this yet — repeat IT-66's pattern when prod is built out.
 - Two branches: dev (deploys to DEV), main (deploys to PROD)
 
 ### Storage topology
@@ -84,7 +84,7 @@ Terraform state files (`*.tfstate`) are also gitignored; remote state uses S3 wi
 - Audit: multi-region CloudTrail with log file validation, shipped to S3 + CloudWatch Logs
 
 ## Known drift / open follow-ups
-- **IT-66** — dev's live catalog is Unity Catalog's auto-generated default (`dev_<workspace_id>`), not a project-named catalog per `docs/naming-conventions.docx`; the `raw/bronze/silver/gold/stage` schemas from `docs/folder-structure.md` were never created.
+- **IT-74** — `databricks_storage_credential.vicmo`/`databricks_external_location.vicmo` in `environments/dev/main.tf` are bespoke, inline resources added by IT-66 to unblock the `vicmo` catalog's storage, not a reusable module. `modules/databricks-external-location` (IT-74, not started) should absorb them.
 - **S3 workspace bucket** (`dbks-infra-dev-s3-ws`) has versioning disabled and SSE-S3 (not SSE-KMS) in the already-applied live bucket — contradicts the security baseline above; preserved as-is in Terraform (state-move only, not a config fix) pending a deliberate remediation.
 - **No NACL** is currently defined in `modules/network` (relies on the AWS default allow-all NACL) despite being described in `docs/architecture/network-topology.md`.
 - **NAT Gateway is the dominant AWS cost driver** for dev (~$30/month, running 24/7) — `docs/manual-deployment-findings.md` Appendix C recommends VPC endpoints (S3/DynamoDB gateway; STS/Kinesis/Secrets Manager/KMS interface) to cut this and keep secret retrieval off the public path; not yet implemented.
